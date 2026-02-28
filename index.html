@@ -85,38 +85,43 @@
             );
         };
 
-        // --- 歩くデフォルメ猫 SVG ---
+        // --- 歩くデフォルメ猫 SVG (視認性を高めるため外枠を追加) ---
         const DeformedCat = ({ color = "#f97316", type = "face", className = "" }) => {
             if (type === "face") {
                 return (
-                    <svg viewBox="0 0 100 100" className={className} fill={color}>
+                    <svg viewBox="0 0 100 100" className={className} fill={color} stroke="white" strokeWidth="2">
                         <path d="M25,25 L15,5 L35,15 Z" /><path d="M75,25 L85,5 L65,15 Z" />
                         <path d="M20,40 Q20,20 40,20 T60,20 T80,40 Q80,70 50,70 T20,40" />
-                        <circle cx="35" cy="40" r="3" fill="black" /><circle cx="65" cy="40" r="3" fill="black" />
+                        <circle cx="35" cy="40" r="3" fill="black" stroke="none" /><circle cx="65" cy="40" r="3" fill="black" stroke="none" />
                         <path d="M45,50 Q50,55 55,50" fill="none" stroke="black" strokeWidth="2" />
                     </svg>
                 );
             }
             return (
-                <svg viewBox="0 0 100 100" className={className} fill={color}>
+                <svg viewBox="0 0 100 100" className={className} fill={color} stroke="white" strokeWidth="2">
+                    {/* 体 */}
                     <rect x="25" y="40" width="50" height="35" rx="15" />
+                    {/* 頭 */}
                     <path d="M30,40 Q30,25 50,25 T70,40" />
                     <path d="M35,28 L30,10 L45,25 Z" /><path d="M65,28 L70,10 L55,25 Z" />
+                    {/* 尻尾 */}
                     <motion.path 
-                        animate={{ rotate: [-10, 10, -10] }}
-                        transition={{ repeat: Infinity, duration: 1 }}
+                        animate={{ rotate: [-15, 15, -15] }}
+                        transition={{ repeat: Infinity, duration: 0.8 }}
                         d="M75,55 Q90,45 85,30" fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" 
                     />
-                    <circle cx="42" cy="38" r="2" fill="black" /><circle cx="58" cy="38" r="2" fill="black" />
+                    {/* 目 */}
+                    <circle cx="42" cy="38" r="2" fill="black" stroke="none" /><circle cx="58" cy="38" r="2" fill="black" stroke="none" />
                     
+                    {/* 歩く足のアニメーション */}
                     <motion.circle 
-                        animate={{ x: [-2, 2, -2], y: [0, -3, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.4 }}
+                        animate={{ x: [-3, 3, -3], y: [0, -4, 0] }}
+                        transition={{ repeat: Infinity, duration: 0.35 }}
                         cx="35" cy="75" r="5" 
                     />
                     <motion.circle 
-                        animate={{ x: [2, -2, 2], y: [0, -3, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.4 }}
+                        animate={{ x: [3, -3, 3], y: [0, -4, 0] }}
+                        transition={{ repeat: Infinity, duration: 0.35 }}
                         cx="65" cy="75" r="5" 
                     />
                 </svg>
@@ -215,7 +220,7 @@
                 <div className="min-h-screen text-slate-700 pb-12 overflow-x-hidden relative">
                     <header className="bg-white/90 backdrop-blur-md border-b-8 border-orange-100 sticky top-0 z-50 px-6 py-4 shadow-sm flex items-center justify-between">
                         <div className="flex items-center gap-4 cursor-pointer" onClick={() => setSelectedItem(null)}>
-                            <motion.div animate={{ rotate: [0, -10, 10, 0] }} transition={{ repeat: Infinity, duration: 4 }} className="bg-orange-500 p-2 rounded-2xl text-white shadow-lg">
+                            <motion.div animate={{ rotate: [0, -10, 10, 0] }} transition={{ repeat: Infinity, duration: 4 }} className="bg-orange-600 p-2 rounded-2xl text-white shadow-lg shadow-orange-200">
                                 <DeformedCat type="face" color="white" className="w-10 h-10" />
                             </motion.div>
                             <h1 className="text-xl md:text-2xl font-black text-orange-600 uppercase italic tracking-tighter leading-none">Neko Explorer</h1>
@@ -226,20 +231,21 @@
                     <main className="max-w-6xl mx-auto px-6 py-8">
                         {!selectedItem ? (
                             <>
-                                <div className="relative h-80 w-full mb-10 overflow-hidden rounded-[3.5rem] bg-white border-8 border-orange-100/50 shadow-inner">
+                                <div className="relative h-96 w-full mb-10 overflow-hidden rounded-[3.5rem] bg-white border-8 border-orange-100/50 shadow-inner">
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 text-center">
-                                        <div className="text-8xl mb-2 text-orange-200">🐾</div>
-                                        <p className="font-black text-orange-400 tracking-[0.5em]">Neko Playground</p>
+                                        <div className="text-8xl mb-2 text-orange-300">🐾</div>
+                                        <p className="font-black text-orange-500 tracking-[0.5em]">Neko Playground</p>
                                     </div>
                                     <AnimatePresence>
                                         {catEvents.map((cat) => (
-                                            <motion.div key={cat.id} initial={{ x: -200, y: cat.yPos + "%", opacity: 0 }} animate={{ x: '120vw', opacity: 1 }} transition={{ duration: 12, ease: "linear" }} className="absolute z-20 pointer-events-none">
-                                                <motion.div animate={{ y: [0, -15, 0] }} transition={{ repeat: Infinity, duration: 0.6, ease: "easeOut" }} className="relative text-center">
-                                                    <div className="bg-white px-4 py-2 rounded-full shadow-lg border-2 border-orange-200 text-[11px] font-black mb-2 inline-block whitespace-nowrap">
+                                            <motion.div key={cat.id} initial={{ x: -300, y: cat.yPos + "%", opacity: 0 }} animate={{ x: '125vw', opacity: 1 }} transition={{ duration: 13, ease: "linear" }} className="absolute z-20 pointer-events-none">
+                                                <motion.div animate={{ y: [0, -20, 0] }} transition={{ repeat: Infinity, duration: 0.5, ease: "easeOut" }} className="relative text-center">
+                                                    <div className="bg-orange-600 text-white px-5 py-2 rounded-full shadow-2xl border-4 border-white text-[12px] font-black mb-3 inline-block whitespace-nowrap">
                                                         {cat.type === 'block' ? '📦 NEW BLOCK!' : '✨ NEW TX!'}
                                                     </div>
-                                                    <DeformedCat type={cat.catType} color={cat.type === 'block' ? '#f97316' : '#fb923c'} className="w-32 h-32 filter drop-shadow-xl" />
-                                                    <div className="absolute -bottom-2 -right-6 text-4xl">{cat.type === 'block' ? '🎁' : '🐟'}</div>
+                                                    {/* 色をより鮮やかなオレンジに（Block:#ff5100, TX:#ff9100） */}
+                                                    <DeformedCat type={cat.catType} color={cat.type === 'block' ? '#ff5100' : '#ff9100'} className="w-40 h-40 filter drop-shadow-[0_15px_15px_rgba(249,115,22,0.4)]" />
+                                                    <div className="absolute -bottom-2 -right-8 text-5xl">{cat.type === 'block' ? '🎁' : '🐟'}</div>
                                                 </motion.div>
                                             </motion.div>
                                         ))}
@@ -247,9 +253,9 @@
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                                    <StatCard icon="Hash" title="Height" value={latestHeight || "..."} color="text-orange-500" />
-                                    <StatCard icon="Box" title="Blocks" value={blocks.length} color="text-pink-500" />
-                                    <StatCard icon="Send" title="TXs" value={transactions.length} color="text-blue-500" />
+                                    <StatCard icon="Hash" title="Height" value={latestHeight || "..."} color="text-orange-600" />
+                                    <StatCard icon="Box" title="Blocks" value={blocks.length} color="text-pink-600" />
+                                    <StatCard icon="Send" title="TXs" value={transactions.length} color="text-blue-600" />
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -262,7 +268,7 @@
                                                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center font-black text-orange-600 border border-orange-50 shadow-inner">#{b.block.height.toString().slice(-3)}</div>
                                                         <div className="text-sm font-black">Height: {b.block.height}</div>
                                                     </div>
-                                                    <Icon name="ChevronDown" size={16} className="-rotate-90 text-orange-300" />
+                                                    <Icon name="ChevronDown" size={16} className="-rotate-90 text-orange-400" />
                                                 </div>
                                             ))}
                                         </div>
@@ -276,7 +282,7 @@
                                                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-2xl border border-blue-50 shadow-inner">🐟</div>
                                                         <div className="min-w-0"><div className="text-sm font-black text-blue-600 truncate max-w-[120px]">Type: {t.transaction.type}</div><div className="text-[9px] text-slate-400 font-mono truncate">{t.meta.hash}</div></div>
                                                     </div>
-                                                    <Icon name="ChevronDown" size={16} className="-rotate-90 text-blue-300" />
+                                                    <Icon name="ChevronDown" size={16} className="-rotate-90 text-blue-400" />
                                                 </div>
                                             ))}
                                         </div>
@@ -290,17 +296,17 @@
                                 </button>
                                 {isDetailLoading ? (
                                     <div className="text-center py-20">
-                                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="inline-block mb-4"><DeformedCat type="face" className="w-20 h-20" /></motion.div>
-                                        <p className="font-black text-orange-400 animate-pulse">猫がデータを一生懸命掘り出してるニャ...</p>
+                                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="inline-block mb-4"><DeformedCat type="face" className="w-24 h-24" /></motion.div>
+                                        <p className="font-black text-orange-500 animate-pulse">猫がデータを一生懸命掘り出してるニャ...</p>
                                     </div>
                                 ) : (
                                     <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="relative bg-white rounded-[3.5rem] p-10 shadow-2xl detail-card border-4 border-orange-100">
                                         <div className="flex justify-between items-start mb-8">
                                             <div>
-                                                <span className="bg-orange-100 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{selectedItem.type} Details</span>
+                                                <span className="bg-orange-100 text-orange-600 text-[11px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{selectedItem.type} Details</span>
                                                 <h2 className="text-2xl md:text-3xl font-black text-slate-800 mt-2 break-all leading-tight">{selectedItem.id}</h2>
                                             </div>
-                                            <DeformedCat type="face" className="w-20 h-20 opacity-20" />
+                                            <DeformedCat type="face" className="w-20 h-20 opacity-30" />
                                         </div>
                                         <div className="space-y-6">
                                             {selectedItem.type === 'block' && selectedItem.data && (
@@ -315,21 +321,22 @@
                                                 <>
                                                     <DetailRow label="送信元猫" value={selectedItem.data.transaction.signerPublicKey} isMono isLink onClick={() => viewDetail('account', selectedItem.data.transaction.signerPublicKey)} />
                                                     <DetailRow label="タイプ" value={selectedItem.data.transaction.type} />
+                                                    <DetailRow label="手数料" value={`${selectedItem.data.transaction.maxFee / 1000000} XYM`} />
                                                     <DetailRow label="承認時の高さ" value={selectedItem.data.meta.height} isLink onClick={() => viewDetail('block', selectedItem.data.meta.height)} />
                                                 </>
                                             )}
                                             {selectedItem.type === 'account' && selectedItem.data && (
                                                 <>
-                                                    <div className="bg-orange-50 rounded-[2rem] p-6 mb-6 flex items-center justify-between">
-                                                        <div><p className="text-[10px] font-black uppercase text-orange-400">Neko Balance</p><p className="text-3xl font-black text-orange-600">XYM お財布</p></div>
-                                                        <Icon name="Fish" size={40} className="text-orange-300" />
+                                                    <div className="bg-orange-50 rounded-[2rem] p-8 mb-6 flex items-center justify-between border-2 border-orange-100 shadow-inner">
+                                                        <div><p className="text-[11px] font-black uppercase text-orange-500">Neko Balance</p><p className="text-4xl font-black text-orange-600 mt-1">XYM お財布</p></div>
+                                                        <Icon name="Fish" size={60} className="text-orange-400 opacity-60" />
                                                     </div>
-                                                    <h3 className="font-black text-lg text-slate-700 flex items-center gap-2 mb-4"><Icon name="Fish" className="text-orange-400" /> 持っているお魚 (Mosaics)</h3>
+                                                    <h3 className="font-black text-xl text-slate-700 flex items-center gap-2 mb-4"><Icon name="Fish" className="text-orange-500" /> 持っているお魚 (Mosaics)</h3>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         {selectedItem.data.mosaics?.map((m, idx) => (
-                                                            <div key={idx} className="bg-slate-50 p-4 rounded-2xl border-2 border-transparent hover:border-orange-100 transition-all">
+                                                            <div key={idx} className="bg-slate-50 p-5 rounded-3xl border-2 border-transparent hover:border-orange-200 transition-all shadow-sm">
                                                                 <p className="text-[10px] font-mono text-slate-400">Mosaic ID: {m.id}</p>
-                                                                <p className="text-lg font-black text-slate-700 mt-1">{m.amount / 1000000} <span className="text-[10px] opacity-50 tracking-tighter">Units</span></p>
+                                                                <p className="text-xl font-black text-slate-800 mt-1">{m.amount / 1000000} <span className="text-xs opacity-50 tracking-tighter">Units</span></p>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -342,12 +349,13 @@
                         )}
                     </main>
 
+                    {/* 通知ポップアップ */}
                     <div className="fixed bottom-8 left-8 z-[100] flex flex-col gap-3 pointer-events-none">
                         <AnimatePresence>
                             {notifications.map((n) => (
                                 <motion.div key={n.id} initial={{ x: -100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -100, opacity: 0 }} 
-                                    className="bg-white p-4 rounded-[2rem] shadow-2xl flex items-center gap-4 border-4 border-orange-100 pointer-events-auto">
-                                    <DeformedCat type="face" className="w-12 h-12" /><div className="text-xs font-black pr-4">{n.message}</div>
+                                    className="bg-white p-5 rounded-[2.5rem] shadow-2xl flex items-center gap-4 border-4 border-orange-200 pointer-events-auto shadow-orange-100/50">
+                                    <DeformedCat type="face" className="w-14 h-14" /><div className="text-sm font-black text-slate-800 pr-4">{n.message}</div>
                                 </motion.div>
                             ))}
                         </AnimatePresence>
@@ -357,17 +365,17 @@
         };
 
         const DetailRow = ({ label, value, isMono = false, isLink = false, onClick = null }) => (
-            <div className="border-b border-orange-50 pb-4">
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">{label}</p>
-                <p onClick={onClick} className={`mt-2 text-sm font-bold break-all ${isMono ? 'font-mono text-[12px]' : ''} ${isLink ? 'text-orange-500 cursor-pointer hover:underline' : 'text-slate-700'}`}>{value}</p>
+            <div className="border-b border-orange-100 pb-5">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none mb-2">{label}</p>
+                <p onClick={onClick} className={`text-base font-bold break-all ${isMono ? 'font-mono text-[13px]' : ''} ${isLink ? 'text-orange-600 cursor-pointer hover:underline' : 'text-slate-700'}`}>{value}</p>
             </div>
         );
 
         const StatCard = ({ icon, title, value, color }) => (
-            <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border-4 border-orange-50 flex items-center gap-4 relative overflow-hidden group">
-                <div className={`p-3 bg-slate-50 rounded-2xl ${color}`}><Icon name={icon} /></div>
-                <div><p className="text-[10px] font-black uppercase opacity-50 tracking-widest leading-none">{title}</p><p className="text-2xl font-black mt-1 leading-none">{value}</p></div>
-                <div className="absolute -bottom-4 -right-4 w-20 h-20 opacity-[0.05] group-hover:scale-110 transition-transform"><DeformedCat type="face" /></div>
+            <div className="bg-white p-7 rounded-[3rem] shadow-xl border-4 border-orange-100 flex items-center gap-5 relative overflow-hidden group">
+                <div className={`p-4 bg-slate-50 rounded-2xl ${color} shadow-inner`}><Icon name={icon} size={24} /></div>
+                <div><p className="text-[11px] font-black uppercase opacity-60 tracking-widest leading-none">{title}</p><p className="text-3xl font-black mt-2 leading-none text-slate-800">{value}</p></div>
+                <div className="absolute -bottom-6 -right-6 w-28 h-28 opacity-[0.12] group-hover:scale-110 transition-transform duration-500"><DeformedCat type="face" /></div>
             </div>
         );
 
