@@ -27,18 +27,24 @@
         const { useState, useEffect, useCallback, useRef } = React;
 
         // --- API 設定 (Canvas環境以外ではキーがないためエラーになりますが、その場合の回避策を実装しました) ---
-        const apiKey = ""; 
+        const apiKey = "AIzaSyB8O4VXp3SGnjSM-ZD2Aux2oBymrRqtYcM"; 
         const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
         const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
         // --- フォールバック用のコメント集 (APIが使えないGitHub環境用) ---
         const NEKO_FALLBACK_COMMENTS = [
             "お魚の香りがするデータだにゃ！",
+            "このTxをもってたくさん歩きたいにゃ！",
             "キラキラした宝石を見つけたにゃ！",
             "ネットワークの風が気持ちいいにゃ〜",
+            "こんなエモいTx初めて見るにゃ〜",
             "誰かの秘密のメッセージかにゃ？",
             "探検はまだまだ続くんだにゃ！",
+            "このデータは大切にするにゃ！",
+            "おいしそうなデータがあるにゃ！",
+            "お昼寝のあとの探検は最高だにゃ！",
             "すごいお宝が眠っていそうだにゃ！",
+            "おもしろいメッセージが入ってるにゃ",
             "お昼寝のあとの探検は最高だにゃ！",
             "ブロックチェーンは広大だにゃ…",
             "新しい足跡を残していくにゃ！"
