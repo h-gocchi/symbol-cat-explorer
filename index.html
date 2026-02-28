@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEKO EXPLORER</title>
-    <!-- React & Babel for direct browser execution -->
+    <title>NEKO EXPLORER - Real Symbol Connect</title>
+    <!-- React & Babel -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,11 +13,10 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #FFFBF7; color: #475569; }
         .text-shadow-sm { text-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        /* 横移動のアニメーション設定 */
-        .moving-actor {
-            transition: left 8s linear;
-            will-change: left;
-        }
+        /* 猫と吹き出しが一緒に動くための設定 */
+        .moving-actor { transition: left 8s linear; will-change: left; }
+        @keyframes pulse-ring { 0% { transform: scale(0.95); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(0.95); opacity: 1; } }
+        .audio-ready-pulse { animation: pulse-ring 2s infinite ease-in-out; }
     </style>
 </head>
 <body>
@@ -26,31 +25,51 @@
     <script type="text/babel">
         const { useState, useEffect, useCallback, useRef } = React;
 
-        // --- API 設定 (Canvas環境以外ではキーがないためエラーになりますが、その場合の回避策を実装しました) ---
+        // --- Symbol 設定 ---
+        // 接続先候補 (Failed to fetch対策として複数用意し、自動で切り替えます)
+        const NODE_CANDIDATES = [
+            "https://symbol-sakura-16.next-web-technology.com:3001",
+            "https://dual-1.nodes-xym.work:3001",
+            "https://api-01.symbol.chat:3001",
+            "https://symbol-node.net:3001",
+            "https://xym.town:3001"
+        ];
+        const SYMBOL_GENESIS_TIME = 1615853185;
+
+        // --- AI & 音声設定 ---
         const apiKey = "AIzaSyB8O4VXp3SGnjSM-ZD2Aux2oBymrRqtYcM"; 
         const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
         const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
-        // --- フォールバック用のコメント集 (APIが使えないGitHub環境用) ---
         const NEKO_FALLBACK_COMMENTS = [
-            "お魚の香りがするデータだにゃ！",
-            "このTxをもってたくさん歩きたいにゃ！",
-            "キラキラした宝石を見つけたにゃ！",
-            "ネットワークの風が気持ちいいにゃ〜",
-            "こんなエモいTx初めて見るにゃ〜",
-            "誰かの秘密のメッセージかにゃ？",
-            "探検はまだまだ続くんだにゃ！",
-            "このデータは大切にするにゃ！",
-            "おいしそうなデータがあるにゃ！",
-            "お昼寝のあとの探検は最高だにゃ！",
-            "すごいお宝が眠っていそうだにゃ！",
-            "おもしろいメッセージが入ってるにゃ",
-            "お昼寝のあとの探検は最高だにゃ！",
-            "ブロックチェーンは広大だにゃ…",
+            "お魚の香りがするデータだにゃ！", "このTxをもってたくさん歩きたいにゃ！",
+            "キラキラした宝石を見つけたにゃ！", "ネットワークの風が気持ちいいにゃ〜",
+            "こんなエモいTx初めて見るにゃ〜", "誰かの秘密のメッセージかにゃ？",
+            "探検はまだまだ続くんだにゃ！", "このデータは大切にするにゃ！",
+            "おいしそうなデータがあるにゃ！", "お昼寝のあとの探検は最高だにゃ！",
+            "すごいお宝が眠っていそうだにゃ！", "おもしろいメッセージが入ってるにゃ",
+            "お昼寝のあとの探検は最高だにゃ！", "ブロックチェーンは広大だにゃ…",
             "新しい足跡を残していくにゃ！"
         ];
 
-        // --- アイコンコンポーネント (Babel Fragment対応済み) ---
+        // --- 変換ヘルパー ---
+        const formatSymbolTimestamp = (timestamp) => {
+            const date = new Date((Number(timestamp) / 1000 + SYMBOL_GENESIS_TIME) * 1000);
+            return date.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/-/g, '/');
+        };
+
+        const decodeHexMessage = (hex) => {
+            if (!hex || hex.length < 2) return null;
+            if (hex.startsWith('00')) {
+                try {
+                    const str = decodeURIComponent(hex.substring(2).replace(/[0-9a-f]{2}/g, '%$&'));
+                    return str;
+                } catch(e) { return "Binary Content"; }
+            }
+            return "Encrypted Data";
+        };
+
+        // --- アイコン ---
         const Icon = ({ name, size = 24, className = "" }) => {
             const icons = {
                 Database: <path d="M3 5V19C3 20.1 5.24 21 8 21C10.76 21 13 20.1 13 19V5C13 3.9 10.76 3 8 3C5.24 3 3 3.9 3 5Z M3 5C3 6.1 5.24 7 8 7C10.76 7 13 6.1 13 5 M3 12C3 13.1 5.24 14 8 14C10.76 14 13 13.1 13 12 M21 5V19C21 20.1 18.76 21 16 21C13.24 21 11 20.1 11 19 M21 5C21 6.1 18.76 7 16 7C13.24 7 11 6.1 11 5 M11 12C11 13.1 13.24 14 16 14C18.76 14 21 13.1 21 12" />,
@@ -80,39 +99,22 @@
                 </React.Fragment>,
                 Fish: <React.Fragment><path d="M23 12c0 3.3-2.7 6-6 6-1.5 0-2.8-.5-3.9-1.5C11 18.5 8.5 20 6 20c-1.5 0-3-.5-4-1.5 1-1 1.5-2.5 1.5-4 0-2.5-1.5-5-1.5-6C3 7.5 4.5 7 6 7c2.5 0 5 1.5 7.1 3.5C14.2 9.5 15.5 9 17 9c3.3 0 6 2.7 6 6z" /><circle cx="18" cy="13" r="1" fill="white" /></React.Fragment>
             };
-            return (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {icons[name]}
-                </svg>
-            );
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name]}</svg>;
         };
 
-        // --- 音声ヘルパー ---
+        // --- 音声生成 ---
         function pcmToWav(pcmData, sampleRate = 24000) {
             const buffer = new ArrayBuffer(44 + pcmData.length);
             const view = new DataView(buffer);
-            const writeString = (offset, string) => {
-                for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
-            };
-            writeString(0, 'RIFF');
-            view.setUint32(4, 32 + pcmData.length, true);
-            writeString(8, 'WAVE');
-            writeString(12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true); // PCM
-            view.setUint16(22, 1, true); // Mono
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * 2, true);
-            view.setUint16(32, 2, true);
-            view.setUint16(34, 16, true);
-            writeString(36, 'data');
-            view.setUint32(40, pcmData.length, true);
-            const pcmBytes = new Uint8Array(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength);
-            new Uint8Array(buffer, 44).set(pcmBytes);
-            return new Blob([buffer], { type: 'audio/wav' });
+            const writeString = (offset, string) => { for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i)); };
+            writeString(0, 'RIFF'); view.setUint32(4, 32 + pcmData.length, true); writeString(8, 'WAVE'); writeString(12, 'fmt ');
+            view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); writeString(36, 'data');
+            view.setUint32(40, pcmData.length, true); const pcmBytes = new Uint8Array(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength);
+            new Uint8Array(buffer, 44).set(pcmBytes); return new Blob([buffer], { type: 'audio/wav' });
         }
 
-        // --- 猫のキャラクター ---
+        // --- 猫のキャラクタ ---
         const CustomCat = ({ className = "w-24 h-24", expression = "normal", isWalking = false, mode = "full", color = "#FBAE83" }) => {
             const viewBox = mode === "face" ? "24 20 52 35" : "0 0 100 100";
             return (
@@ -130,50 +132,19 @@
                         <path d="M28 35 L 36 22 Q 42 22 44 35 Z" fill={color} />
                         <path d="M72 35 L 64 22 Q 58 22 56 35 Z" fill={color} />
                         <g>
-                            {expression === 'blink' ? (
-                                <React.Fragment>
-                                    <line x1="38" y1="42" x2="46" y2="42" stroke="#555" strokeWidth="3" strokeLinecap="round" />
-                                    <line x1="54" y1="42" x2="62" y2="42" stroke="#555" strokeWidth="3" strokeLinecap="round" />
-                                </React.Fragment>
-                            ) : expression === 'happy' ? (
-                                <React.Fragment>
-                                    <path d="M38 43 Q42 39 46 43" stroke="#555" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-                                    <path d="M54 43 Q58 39 62 43" stroke="#555" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-                                </React.Fragment>
-                            ) : expression === 'surprised' ? (
-                                <React.Fragment>
-                                    <circle cx="42" cy="42" r="3.5" fill="#555" />
-                                    <circle cx="58" cy="42" r="3.5" fill="#555" />
-                                </React.Fragment>
-                            ) : (
-                                <React.Fragment>
-                                    <circle cx="42" cy="42" r="3" fill="#555" />
-                                    <circle cx="58" cy="42" r="3" fill="#555" />
-                                </React.Fragment>
-                            )}
+                            {expression === 'blink' ? <React.Fragment><line x1="38" y1="42" x2="46" y2="42" stroke="#555" strokeWidth="3" strokeLinecap="round" /><line x1="54" y1="42" x2="62" y2="42" stroke="#555" strokeWidth="3" strokeLinecap="round" /></React.Fragment>
+                            : expression === 'happy' ? <React.Fragment><path d="M38 43 Q42 39 46 43" stroke="#555" strokeWidth="2.5" fill="none" strokeLinecap="round" /><path d="M54 43 Q58 39 62 43" stroke="#555" strokeWidth="2.5" fill="none" strokeLinecap="round" /></React.Fragment>
+                            : expression === 'surprised' ? <React.Fragment><circle cx="42" cy="42" r="3.5" fill="#555" /><circle cx="58" cy="42" r="3.5" fill="#555" /></React.Fragment>
+                            : <React.Fragment><circle cx="42" cy="42" r="3" fill="#555" /><circle cx="58" cy="42" r="3" fill="#555" /></React.Fragment>}
                         </g>
                         <path d="M46 48 Q50 51 54 48" stroke="#555" strokeWidth="1.3" fill="none" />
                     </svg>
-                    {mode === "full" && (
-                        <div className="absolute bottom-5 -right-3 transform rotate-6 scale-[0.7]">
-                            <div className="w-10 h-10 bg-[#E9D5B5] border-2 border-[#D8C2A2] rounded-md relative shadow-sm">
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2.5 h-full bg-[#E8A5AC]"></div>
-                                <div className="absolute top-1/2 left-0 -translate-y-1/2 w-full h-2.5 bg-[#E8A5AC]"></div>
-                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">🎀</div>
-                            </div>
-                        </div>
-                    )}
+                    {mode === "full" && <div className="absolute bottom-5 -right-3 transform rotate-6 scale-[0.7]"><div className="w-10 h-10 bg-[#E9D5B5] border-2 border-[#D8C2A2] rounded-md relative shadow-sm"><div className="absolute top-0 left-1/2 -translate-x-1/2 w-2.5 h-full bg-[#E8A5AC]"></div><div className="absolute top-1/2 left-0 -translate-y-1/2 w-full h-2.5 bg-[#E8A5AC]"></div><div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">🎀</div></div></div>}
                 </div>
             );
         };
 
-        const PawPrint = ({ className = "" }) => (
-            <div className={`text-slate-500 ${className}`}>
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <circle cx="12" cy="14" r="4" /><circle cx="7" cy="8" r="2.5" /><circle cx="11" cy="6" r="2.5" /><circle cx="15" cy="7" r="2.5" /><circle cx="18" cy="10" r="2.5" />
-                </svg>
-            </div>
-        );
+        const PawPrint = ({ className = "" }) => <div className={`text-slate-500 ${className}`}><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="14" r="4" /><circle cx="7" cy="8" r="2.5" /><circle cx="11" cy="6" r="2.5" /><circle cx="15" cy="7" r="2.5" /><circle cx="18" cy="10" r="2.5" /></svg></div>;
 
         const Modal = ({ isOpen, onClose, title, children }) => {
             if (!isOpen) return null;
@@ -181,17 +152,7 @@
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
                     <div className="bg-white rounded-[2.5rem] w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200">
-                        <header className="p-6 border-b border-slate-50 flex items-center justify-between">
-                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500">
-                                    <Icon name="Database" size={20} />
-                                </div>
-                                {title}
-                            </h2>
-                            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 text-slate-400 transition-colors">
-                                <Icon name="X" size={24} />
-                            </button>
-                        </header>
+                        <header className="p-6 border-b border-slate-50 flex items-center justify-between"><h2 className="text-xl font-black text-slate-800 flex items-center gap-3"><div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500"><Icon name="Database" size={20} /></div>{title}</h2><button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 text-slate-400 transition-colors"><Icon name="X" size={24} /></button></header>
                         <div className="p-6 overflow-y-auto">{children}</div>
                     </div>
                 </div>
@@ -200,183 +161,149 @@
 
         const DetailRow = ({ icon, label, value, onClick, isMessage = false }) => (
             <div className="flex flex-col py-4 border-b border-slate-50 gap-1 group">
-                <div className="flex items-center gap-2 text-slate-400">
-                    <Icon name={icon} size={14} />
-                    <span className="text-xs font-bold uppercase tracking-wider">{label}</span>
-                </div>
-                <div 
-                    className={`text-sm font-bold text-slate-700 break-all font-mono p-2 rounded-lg mt-1 ${isMessage ? 'bg-indigo-50 border-l-4 border-indigo-300' : 'bg-slate-50'} ${onClick ? 'text-blue-600 hover:bg-blue-50 cursor-pointer transition-colors' : ''}`} 
-                    onClick={onClick}
-                >
-                    {value}
-                </div>
+                <div className="flex items-center gap-2 text-slate-400"><Icon name={icon} size={14} /><span className="text-xs font-bold uppercase tracking-wider">{label}</span></div>
+                <div className={`text-sm font-bold text-slate-700 break-all font-mono p-2 rounded-lg mt-1 ${isMessage ? 'bg-indigo-50 border-l-4 border-indigo-300' : 'bg-slate-50'} ${onClick ? 'text-blue-600 hover:bg-blue-50 cursor-pointer transition-colors' : ''}`} onClick={onClick}>{value}</div>
             </div>
         );
 
         // --- メイン App ---
         const App = () => {
-            const [height, setHeight] = useState(5205793);
-            const [blocks, setBlocks] = useState([
-                { id: 793, height: 5205793, time: '2026/03/01 14:38:23', txCount: 5, harvester: 'NCX7YP5L6M7M3N2K9L4J5H6G7F8E9D0C1B2A3Z4X', hash: '87D8E9F0A1B2C3D4E5F67890A1B2C3D4E5F67890A1B2C3D4E5F67890A1B2C3D4' },
-                { id: 792, height: 5205792, time: '2026/03/01 14:38:08', txCount: 12, harvester: 'NDFK2W8X7V6U5T4S3R2Q1P0O9N8M7L6K5J4I3H2G', hash: '21AE90B1C2D3E4F5A6B7C8D9E0F1A2B3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9' },
-                { id: 791, height: 5205791, time: '2026/03/01 14:37:50', txCount: 0, harvester: 'NAAL9Q8P7O6N5M4L3K2J1I0H9G8F7E6D5C4B3A2Z', hash: '55CB12D3E4F5A6B7C8D9E0F1A2B3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B1' },
-            ]);
-            const [txs, setTxs] = useState([
-                { id: '2DDB4FF1C24B4C31BD3DDFF64E92C83BA2C3F825EBBB9E67890A1B2C3D4E5F67', type: 'Transfer', status: 'CONFIRMED', block: '#5205789', comment: '美味しいお魚の取引かにゃ？', sender: 'NBT8RR7Q6P5O4N3M2L1K0J9I8H7G6F5E4D3C2B1A', recipient: 'NAY4XX3W2V1U0T9S8R7Q6P5O4N3M2L1K0J9I8H7G', mosaic: '72C1E09C682A6E55 (10 XYM)', message: 'Gift for cat food' },
-                { id: 'ABC3630FDE1505789F7F2DFC5F8513EF5C461A984AD5EA0B1C2D3E4F5A6B7C8D', type: 'Transfer', status: 'CONFIRMED', block: '#5205784', comment: '大きなデータが動いたにゃ！', sender: 'NDD9PP8O7N6M5L4K3J2I1H0G9F8E7D6C5B4A3Z2X', recipient: 'NZZ2QQ1P0O9N8M7L6K5J4I3H2G1F0E9D8C7B6A5', mosaic: '72C1E09C682A6E55 (500 XYM)', message: 'Payment of invoice #102' },
-            ]);
-            
+            const [activeNode, setActiveNode] = useState(NODE_CANDIDATES[0]);
+            const [height, setHeight] = useState(0);
+            const [blocks, setBlocks] = useState([]);
+            const [txs, setTxs] = useState([]);
             const [modalContent, setModalContent] = useState(null);
-            const [expression, setExpression] = useState('normal');
             const [headerExpression, setHeaderExpression] = useState('normal'); 
             const [playgroundMessage, setPlaygroundMessage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
             const [catPosition, setCatPosition] = useState(50); 
             const [isAnimating, setIsAnimating] = useState(false);
-            const [audioError, setAudioError] = useState(false);
+            const [audioBlocked, setAudioBlocked] = useState(true);
 
-            const fetchWithRetry = async (url, options, retries = 5, backoff = 1000) => {
+            // API 共通リトライ
+            const fetchWithRetry = async (url, options = {}, retries = 3, backoff = 500) => {
                 try {
                     const response = await fetch(url, options);
                     if (!response.ok) throw new Error(`API Error ${response.status}`);
                     return await response.json();
                 } catch (err) {
-                    if (retries > 0) {
-                        await new Promise(r => setTimeout(r, backoff));
-                        return fetchWithRetry(url, options, retries - 1, backoff * 2);
-                    }
+                    if (retries > 0) { await new Promise(r => setTimeout(r, backoff)); return fetchWithRetry(url, options, retries - 1, backoff * 2); }
                     throw err;
                 }
             };
 
-            const playNyariin = async (style = "cheerful") => {
-                if (!apiKey) {
-                    console.log("No API Key. Skip voice generation.");
-                    return;
+            // 生存しているノードを探す
+            const findBestNode = async () => {
+                for (let node of NODE_CANDIDATES) {
+                    try {
+                        const controller = new AbortController();
+                        const id = setTimeout(() => controller.abort(), 2500);
+                        const res = await fetch(`${node}/chain/info`, { signal: controller.signal });
+                        clearTimeout(id);
+                        if (res.ok) {
+                            setActiveNode(node);
+                            return node;
+                        }
+                    } catch(e) { /* next candidate */ }
                 }
-                setAudioError(false);
-                try {
-                    const result = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            model: TTS_MODEL,
-                            contents: [{ parts: [{ text: `Say in a very cute, ${style}, high-pitched voice: にゃりーん！` }] }],
-                            generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } }
-                        })
-                    });
-                    const audioPart = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-                    if (audioPart?.inlineData?.data) {
-                        const binary = atob(audioPart.inlineData.data);
-                        const bytes = new Uint8Array(binary.length);
-                        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                        const audio = new Audio(URL.createObjectURL(pcmToWav(bytes, 24000)));
-                        audio.play().catch(() => setAudioError(true));
-                    }
-                } catch (e) { 
-                    console.error("Voice playback error:", e); 
-                    setAudioError(true);
-                }
+                return activeNode;
             };
 
-            const generateNewBlock = useCallback(async () => {
-                if (isGenerating) return;
+            const playNyariin = async (style = "cheerful") => {
+                if (!apiKey) return;
+                try {
+                    const result = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model: TTS_MODEL, contents: [{ parts: [{ text: `Say in a very cute, ${style}, high-pitched voice: にゃりーん！` }] }], generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } } })
+                    });
+                    const audioPart = result.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                    if (audioPart) {
+                        const binary = atob(audioPart); const bytes = new Uint8Array(binary.length); for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                        const audio = new Audio(URL.createObjectURL(pcmToWav(bytes, 24000)));
+                        audio.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
+                    }
+                } catch (e) { console.error(e); }
+            };
+
+            const triggerNekoAnimation = (newHeight, latestTx) => {
                 setIsGenerating(true);
-                
-                const now = new Date();
-                const fullTimestamp = now.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/-/g, '/');
-                const newHeight = height + 1;
-                const blockId = Math.floor(Math.random() * 1000);
-                const newTxId = Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
-                
-                // アニメーション初期化
                 setIsAnimating(false);
-                setCatPosition(-25); 
-                setExpression('surprised');
+                setCatPosition(-25);
                 setPlaygroundMessage(`新ブロック #${newHeight} 到着ニヤ！`);
-                
                 playNyariin();
 
                 setTimeout(() => {
                     setIsAnimating(true);
-                    setCatPosition(125); 
-                    
-                    const themes = [
-                        "新しいトランザクションをお魚や宝石に例えて短く。語尾は〜だにゃ！",
-                        "探検家猫がすごいデータを見つけた感動を短く。語尾は〜にゃ！",
-                        "ネットワークの風が気持ちいいといった内容を短く。語尾は〜だにゃ！",
-                        "お昼寝から起きてすぐデータを見つけた驚きを短く。語尾は〜だにゃ！",
-                        "ブロックチェーンがキラキラ輝いている様子を短く。語尾は〜にゃ！"
-                    ];
-                    const selectedTheme = themes[Math.floor(Math.random() * themes.length)];
-                    const mockMessages = ["P2P Payment", "SDK Automated Test", "Mosaic Transfer", "Invoice Payment", "Node Reward", "Explorer Test"];
-                    const rawMessage = mockMessages[Math.floor(Math.random() * mockMessages.length)];
+                    setCatPosition(125);
 
-                    // AI API呼び出し (キーがないGitHub環境でも動くようにフォールバック)
                     const fetchComment = async () => {
-                        if (!apiKey) throw new Error("No Key");
+                        if (!apiKey) throw new Error();
                         const res = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents: [{ parts: [{ text: `あなたは可愛い猫のキャラクターです。${selectedTheme}。絶対に15文字以内。` }] }] })
+                            body: JSON.stringify({ contents: [{ parts: [{ text: `あなたは可愛い猫のキャラクターです。Symbolブロックチェーンで新しい取引を見つけました。内容: ${latestTx.message || "データ送受信"}. 日本語15文字以内で可愛く解説して。語尾〜だにゃ！` }] }] })
                         });
                         return res.candidates?.[0]?.content?.parts?.[0]?.text;
                     };
 
                     fetchComment().then(comment => {
-                        const finalComment = comment || NEKO_FALLBACK_COMMENTS[Math.floor(Math.random() * NEKO_FALLBACK_COMMENTS.length)];
-                        setPlaygroundMessage(finalComment);
-                        setTxs(prev => [{ 
-                            id: newTxId, type: 'Transfer', status: 'CONFIRMED', block: `#${newHeight}`, comment: finalComment, 
-                            sender: 'N' + Array.from({length: 38}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]).join(''),
-                            recipient: 'N' + Array.from({length: 38}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]).join(''),
-                            mosaic: '72C1E09C682A6E55 (1.5 XYM)',
-                            message: rawMessage
-                        }, ...prev.slice(0, 4)]);
+                        setPlaygroundMessage(comment || NEKO_FALLBACK_COMMENTS[Math.floor(Math.random() * NEKO_FALLBACK_COMMENTS.length)]);
                     }).catch(() => {
-                        // 通信失敗時のフォールバック
-                        const fallback = NEKO_FALLBACK_COMMENTS[Math.floor(Math.random() * NEKO_FALLBACK_COMMENTS.length)];
-                        setPlaygroundMessage(fallback);
-                        setTxs(prev => [{ 
-                            id: newTxId, type: 'Transfer', status: 'CONFIRMED', block: `#${newHeight}`, comment: fallback, 
-                            sender: 'N' + Array.from({length: 38}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]).join(''),
-                            recipient: 'N' + Array.from({length: 38}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]).join(''),
-                            mosaic: '72C1E09C682A6E55 (1.5 XYM)',
-                            message: rawMessage
-                        }, ...prev.slice(0, 4)]);
+                        setPlaygroundMessage(NEKO_FALLBACK_COMMENTS[Math.floor(Math.random() * NEKO_FALLBACK_COMMENTS.length)]);
                     });
 
-                    setBlocks(prev => [{ 
-                        id: blockId, height: newHeight, time: fullTimestamp, txCount: 1, 
-                        harvester: 'N' + Array.from({length: 38}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]).join(''),
-                        hash: Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase()
-                    }, ...prev.slice(0, 4)]);
-                    setHeight(newHeight);
-
                     setTimeout(() => {
-                        setIsAnimating(false);
-                        setPlaygroundMessage(null);
-                        setExpression('happy');
-                        setTimeout(() => { 
-                            setCatPosition(50); 
-                            setExpression('normal'); 
-                            setIsGenerating(false); 
-                        }, 1000);
+                        setIsAnimating(false); setPlaygroundMessage(null);
+                        setTimeout(() => { setCatPosition(50); setIsGenerating(false); }, 1000);
                     }, 8000);
                 }, 150);
-            }, [height, isGenerating]);
+            };
+
+            const updateBlockchainData = useCallback(async () => {
+                try {
+                    const node = await findBestNode();
+                    const chainInfo = await fetchWithRetry(`${node}/chain/info`);
+                    const currentHeight = Number(chainInfo.height);
+                    
+                    if (currentHeight > height) {
+                        const prevHeight = height;
+                        setHeight(currentHeight);
+
+                        const blockList = await fetchWithRetry(`${node}/blocks?limit=10&order=desc`);
+                        setBlocks(blockList.data.map(b => ({
+                            id: b.block.height, height: b.block.height, time: formatSymbolTimestamp(b.block.timestamp),
+                            txCount: b.block.transactionsCount, harvester: b.block.signerPublicKey, hash: b.meta.hash
+                        })));
+
+                        const txList = await fetchWithRetry(`${node}/transactions/confirmed?limit=10&order=desc`);
+                        const mappedTxs = txList.data.map(t => ({
+                            id: t.meta.hash, type: "Transfer", status: "CONFIRMED", block: `#${t.meta.height}`,
+                            sender: t.transaction.signerPublicKey, recipient: t.transaction.recipientAddress || "N/A",
+                            mosaic: t.transaction.mosaics ? `${t.transaction.mosaics[0]?.id} (${t.transaction.mosaics[0]?.amount})` : "N/A",
+                            message: decodeHexMessage(t.transaction.message),
+                            comment: null
+                        }));
+                        setTxs(mappedTxs);
+
+                        if (prevHeight > 0 && !isGenerating) {
+                            triggerNekoAnimation(currentHeight, mappedTxs[0]);
+                        }
+                    }
+                } catch (e) { console.error("Symbol API Connection Failed. Retrying later...", e); }
+            }, [height, isGenerating, activeNode]);
 
             useEffect(() => {
-                const timer = setInterval(generateNewBlock, 30000);
+                updateBlockchainData();
+                const timer = setInterval(updateBlockchainData, 20000);
                 return () => clearInterval(timer);
-            }, [generateNewBlock]);
+            }, [updateBlockchainData]);
 
             useEffect(() => {
                 const timer = setInterval(() => {
                     const rand = Math.random();
-                    if (rand < 0.6) { setHeaderExpression('normal'); } 
-                    else if (rand < 0.8) { setHeaderExpression('blink'); setTimeout(() => setHeaderExpression('normal'), 200); } 
+                    if (rand < 0.6) setHeaderExpression('normal');
+                    else if (rand < 0.8) { setHeaderExpression('blink'); setTimeout(() => setHeaderExpression('normal'), 200); }
                     else { setHeaderExpression('happy'); setTimeout(() => setHeaderExpression('normal'), 1000); }
-                }, 4500);
+                }, 4000);
                 return () => clearInterval(timer);
             }, []);
 
@@ -384,23 +311,26 @@
                 <div className="min-h-screen p-4 md:p-8 relative overflow-x-hidden selection:bg-orange-100">
                     <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 px-2 text-slate-700">
                         <div className="flex items-center gap-4">
-                            <div className={`w-14 h-14 bg-[#F47A42] rounded-[1.2rem] flex items-center justify-center shadow-lg cursor-pointer overflow-hidden relative ${audioError ? 'ring-4 ring-orange-200' : ''}`} onClick={() => { setHeaderExpression('happy'); playNyariin("excited"); }}>
+                            <div 
+                                className={`w-14 h-14 bg-[#F47A42] rounded-[1.2rem] flex items-center justify-center shadow-lg cursor-pointer overflow-hidden relative ${audioBlocked ? 'ring-4 ring-orange-200 audio-ready-pulse' : ''}`} 
+                                onClick={() => { playNyariin("excited"); setAudioBlocked(false); }}
+                            >
                                 <CustomCat className="w-full h-full p-1" color="white" expression={headerExpression} mode="face" />
-                                {audioError && <div className="absolute top-0 right-0 p-1 bg-white rounded-bl-lg"><Icon name="Volume2" size={12} className="text-orange-500" /></div>}
+                                {audioBlocked && <div className="absolute top-0 right-0 p-1 bg-white rounded-bl-lg"><Icon name="Volume2" size={12} className="text-orange-500" /></div>}
                             </div>
                             <div>
-                                <h1 className="text-2xl font-black text-[#F47A42] italic text-shadow-sm">NEKO EXPLORER</h1>
-                                <div className="text-xs font-semibold text-slate-300">dual-1.nodes-xym.work</div>
+                                <h1 className="text-2xl font-black text-[#F47A42] italic text-shadow-sm uppercase">Neko Explorer</h1>
+                                <div className="text-[10px] font-bold text-slate-300 truncate max-w-[150px]">{activeNode.replace('https://', '')}</div>
                             </div>
                         </div>
                         <div className="flex gap-3">
-                            <button className="w-12 h-12 flex items-center justify-center bg-white border-2 border-[#F9F1E8] rounded-2xl text-slate-400 hover:text-[#F47A42] transition-all"><Icon name="Database" size={22} /></button>
-                            <button onClick={generateNewBlock} disabled={isGenerating} className={`w-12 h-12 flex items-center justify-center bg-[#F47A42] rounded-2xl text-white shadow-lg transition-all ${isGenerating ? 'opacity-50' : ''}`}><Icon name="RotateCcw" size={22} className={isGenerating ? 'animate-spin' : ''} /></button>
+                            <button onClick={updateBlockchainData} className="w-12 h-12 flex items-center justify-center bg-[#F47A42] rounded-2xl text-white shadow-lg transition-all active:scale-95"><Icon name="RotateCcw" size={22} /></button>
                         </div>
                     </header>
 
                     <section className="max-w-7xl mx-auto mb-10 px-2">
                         <div className="bg-white rounded-[4rem] p-16 relative overflow-hidden shadow-md border border-orange-50 flex flex-col items-center justify-center min-h-[420px]">
+                            {/* 足跡背景 (復活: 9箇所) */}
                             <div className="absolute inset-0 pointer-events-none">
                                 <PawPrint className="absolute top-10 left-10 w-20 h-20 rotate-12 opacity-[0.45]" />
                                 <PawPrint className="absolute bottom-16 left-20 w-24 h-24 rotate-6 opacity-[0.4]" />
@@ -422,63 +352,42 @@
                                     transition: isAnimating ? 'left 8s linear' : 'none' 
                                 }}
                             >
-                                {playgroundMessage && (
-                                    <div className="absolute bottom-full mb-2 bg-white border-2 border-orange-100 rounded-[2rem] px-5 py-3 shadow-xl w-max max-w-[260px] sm:max-w-[280px] z-20">
-                                        <p className="font-black text-slate-800 text-base leading-snug whitespace-normal">「{playgroundMessage}」</p>
-                                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-r-2 border-b-2 border-orange-100 rotate-45"></div>
-                                    </div>
-                                )}
-                                <CustomCat expression={expression} isWalking={isGenerating} mode="full" />
+                                {playgroundMessage && <div className="absolute bottom-full mb-2 bg-white border-2 border-orange-100 rounded-[2rem] px-5 py-3 shadow-xl w-max max-w-[240px] sm:max-w-[280px] z-20"><p className="font-black text-slate-800 text-base leading-snug whitespace-normal">「{playgroundMessage}」</p><div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-r-2 border-b-2 border-orange-100 rotate-45"></div></div>}
+                                <CustomCat expression={isGenerating ? 'surprised' : 'normal'} isWalking={isGenerating} mode="full" />
                             </div>
-                            
                             <h2 className="text-3xl font-black text-[#F9EAD8] tracking-[0.5em] uppercase italic select-none mt-auto pointer-events-none text-center">Neko Playground</h2>
                         </div>
                     </section>
 
                     <section className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-12 px-2 text-slate-700">
-                        <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-orange-50 group hover:border-orange-200 transition-colors"><div className="flex items-center gap-2 mb-2"><Icon name="Hash" size={20} className="text-orange-500" /><span className="text-xs font-bold text-slate-300 tracking-widest uppercase">Height</span></div><p className="text-5xl font-black tabular-nums">{height}</p></div>
-                        <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-orange-50 group hover:border-orange-200 transition-colors"><div className="flex items-center gap-2 mb-2"><Icon name="Box" size={20} className="text-orange-500" /><span className="text-xs font-bold text-slate-300 tracking-widest uppercase">Blocks</span></div><p className="text-5xl font-black">{blocks.length}</p></div>
-                        <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-orange-50 group hover:border-blue-200 transition-colors"><div className="flex items-center gap-2 mb-2"><Icon name="Send" size={20} className="text-blue-500" /><span className="text-xs font-bold text-slate-300 tracking-widest uppercase">Txs</span></div><p className="text-5xl font-black">{txs.length}</p></div>
+                        <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-orange-50 group hover:border-orange-200 transition-colors"><div className="flex items-center gap-2 mb-2"><Icon name="Hash" size={20} className="text-orange-500" /><span className="text-xs font-bold text-slate-300 tracking-widest uppercase">Height</span></div><p className="text-5xl font-black tabular-nums">{height || '---'}</p></div>
+                        <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-orange-50"><div className="flex items-center gap-2 mb-2"><Icon name="Box" size={20} className="text-orange-500" /><span className="text-xs font-bold text-slate-300 tracking-widest uppercase">Blocks</span></div><p className="text-5xl font-black">{blocks.length}</p></div>
+                        <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-orange-50"><div className="flex items-center gap-2 mb-2"><Icon name="Send" size={20} className="text-blue-500" /><span className="text-xs font-bold text-slate-300 tracking-widest uppercase">TXs</span></div><p className="text-5xl font-black">{txs.length}</p></div>
                     </section>
 
-                    <section className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 px-2 pb-20">
-                        <div className="bg-white/40 rounded-[3.5rem] p-8 text-slate-700 border border-slate-100/50 shadow-sm">
+                    <section className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 px-2 pb-20 text-slate-700">
+                        <div className="bg-white/40 rounded-[3.5rem] p-8 shadow-sm border border-slate-100/50">
                             <h3 className="text-2xl font-black mb-8 flex items-center gap-3"><Icon name="Box" size={24} className="text-orange-400" />Latest Blocks</h3>
                             <div className="space-y-5">
                                 {blocks.map(b => (
-                                    <div key={b.id} onClick={() => setModalContent({type:'block', data:b})} className="bg-white rounded-[2.5rem] p-6 shadow-sm flex items-center justify-between cursor-pointer hover:translate-x-1 transition-transform group border border-transparent hover:border-orange-100">
+                                    <div key={b.hash} onClick={() => setModalContent({type:'block', data:b})} className="bg-white rounded-[2.5rem] p-6 shadow-sm flex items-center justify-between cursor-pointer hover:translate-x-1 transition-transform group border border-transparent hover:border-orange-100">
                                         <div className="flex items-center gap-5">
-                                            <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
-                                                <Icon name="CatFace" size={28} />
-                                            </div>
-                                            <div>
-                                                <div className="text-3xl font-black text-orange-500">#{b.id}</div>
-                                                <div className="text-xs font-bold text-slate-300">{b.time.split(' ')[1]}</div>
-                                            </div>
+                                            <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform"><Icon name="CatFace" size={28} /></div>
+                                            <div><div className="text-3xl font-black text-orange-500">#{b.id}</div><div className="text-xs font-bold text-slate-300">{b.time}</div></div>
                                         </div>
                                         <Icon name="ExternalLink" className="text-orange-100 group-hover:text-orange-400 transition-colors" />
                                     </div>
                                 ))}
                             </div>
                         </div>
-
                         <div className="bg-blue-50/10 rounded-[3.5rem] p-8 border border-blue-50/50 text-slate-700 shadow-sm">
                             <h3 className="text-2xl font-black mb-8 flex items-center gap-3"><Icon name="Send" size={24} className="text-blue-400" />Recent TXs</h3>
                             <div className="space-y-5">
-                                {txs.map((t, i) => (
-                                    <div key={i} onClick={() => setModalContent({type:'tx', data:t})} className="bg-white rounded-[2.5rem] p-6 shadow-sm cursor-pointer hover:-translate-y-1 transition-transform border border-transparent hover:border-blue-100 group">
+                                {txs.map(t => (
+                                    <div key={t.id} onClick={() => setModalContent({type:'tx', data:t})} className="bg-white rounded-[2.5rem] p-6 shadow-sm cursor-pointer hover:-translate-y-1 transition-transform border border-transparent hover:border-blue-100 group">
                                         <div className="flex items-start gap-5">
-                                            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-400 group-hover:rotate-12 transition-transform shrink-0">
-                                                <Icon name="Fish" size={28} />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-black text-blue-500 mb-1">{t.type}</div>
-                                                <div className="text-[10px] text-slate-300 font-mono truncate mb-2">{t.id}</div>
-                                                {t.comment && <div className="p-3 bg-slate-50 rounded-xl text-xs italic font-bold text-slate-500 flex items-center gap-2">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse"></div>
-                                                    「{t.comment}」
-                                                </div>}
-                                            </div>
+                                            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-400 shrink-0 group-hover:rotate-12 transition-transform"><Icon name="Fish" size={28} /></div>
+                                            <div className="flex-1 min-w-0"><div className="font-black text-blue-500 mb-1 truncate">{t.type}</div><div className="text-[10px] text-slate-300 font-mono truncate mb-2">{t.id}</div>{t.message && <div className="p-3 bg-slate-50 rounded-xl text-xs italic font-bold text-slate-500">「{t.message}」</div>}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -486,42 +395,9 @@
                         </div>
                     </section>
 
-                    <div className="fixed bottom-10 right-10 z-50">
-                        <button className="w-16 h-16 bg-slate-900 rounded-[1.5rem] text-white flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"><Icon name="MoreVertical" size={28} /></button>
-                    </div>
-
                     <Modal isOpen={!!modalContent} onClose={() => setModalContent(null)} title={modalContent?.type.toUpperCase()}>
-                        {modalContent?.type === 'block' && (
-                            <React.Fragment>
-                                <DetailRow icon="Hash" label="Height" value={modalContent.data.height} />
-                                <DetailRow icon="Clock" label="Full Timestamp" value={modalContent.data.time} />
-                                <DetailRow icon="User" label="Harvester (Full Address)" value={modalContent.data.harvester} />
-                                <DetailRow icon="ShieldCheck" label="Block Hash" value={modalContent.data.hash} />
-                                <div className="mt-4 p-4 bg-orange-50 rounded-2xl text-sm italic font-bold text-orange-700 flex gap-3 items-center">
-                                    <Icon name="CatFace" size={20} className="text-orange-400" />
-                                    「このブロックには大切なデータが詰まっているにゃ！」
-                                </div>
-                            </React.Fragment>
-                        )}
-                        {modalContent?.type === 'tx' && (
-                            <React.Fragment>
-                                <DetailRow icon="Copy" label="Transaction Hash" value={modalContent.data.id} />
-                                <DetailRow icon="User" label="Sender (Full Address)" value={modalContent.data.sender} />
-                                <DetailRow icon="User" label="Recipient (Full Address)" value={modalContent.data.recipient} />
-                                <DetailRow icon="Coins" label="Mosaic" value={modalContent.data.mosaic} />
-                                <DetailRow icon="Box" label="Block" value={modalContent.data.block} />
-                                {modalContent.data.message && (
-                                    <DetailRow icon="MessageSquare" label="Transaction Message" value={modalContent.data.message} isMessage={true} />
-                                )}
-                                <div className="mt-6 flex items-start gap-4 bg-orange-50 p-4 rounded-3xl border border-orange-100">
-                                    <div className="shrink-0"><CustomCat className="w-10 h-10" mode="face" /></div>
-                                    <div>
-                                        <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">Cat's Comment</p>
-                                        <p className="text-sm font-bold text-orange-700 italic leading-relaxed">「{modalContent.data.comment}」</p>
-                                    </div>
-                                </div>
-                            </React.Fragment>
-                        )}
+                        {modalContent?.type === 'block' && <React.Fragment><DetailRow icon="Hash" label="Height" value={modalContent.data.height} /><DetailRow icon="Clock" label="Full Timestamp" value={modalContent.data.time} /><DetailRow icon="User" label="Harvester (Public Key)" value={modalContent.data.harvester} /><DetailRow icon="ShieldCheck" label="Block Hash" value={modalContent.data.hash} /></React.Fragment>}
+                        {modalContent?.type === 'tx' && <React.Fragment><DetailRow icon="Copy" label="Transaction Hash" value={modalContent.data.id} /><DetailRow icon="User" label="Sender (Public Key)" value={modalContent.data.sender} /><DetailRow icon="User" label="Recipient (Encoded)" value={modalContent.data.recipient} /><DetailRow icon="Coins" label="Mosaic ID / Amount" value={modalContent.data.mosaic} /><DetailRow icon="Box" label="Block" value={modalContent.data.block} />{modalContent.data.message && <DetailRow icon="MessageSquare" label="Transaction Message" value={modalContent.data.message} isMessage={true} />}<div className="mt-6 flex items-start gap-4 bg-orange-50 p-4 rounded-3xl border border-orange-100"><div className="shrink-0"><CustomCat className="w-10 h-10" mode="face" /></div><div><p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">Cat's Analysis</p><p className="text-sm font-bold text-orange-700 italic leading-relaxed">「Symbolネットワークで新しいデータを確認したにゃ！本物のデータはキラキラしてて面白いんだにゃ〜」</p></div></div></React.Fragment>}
                     </Modal>
                 </div>
             );
