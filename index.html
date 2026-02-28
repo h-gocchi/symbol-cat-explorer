@@ -19,16 +19,29 @@
             padding: 0;
             overflow-x: hidden;
         }
-        /* スクロールバーのデザイン */
-        ::-webkit-scrollbar {
-            width: 8px;
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        /* 猫耳詳細カードのデザイン */
+        .detail-card::before {
+            content: '';
+            position: absolute;
+            top: -25px;
+            left: 30px;
+            width: 60px;
+            height: 50px;
+            background-color: white;
+            border-radius: 50% 50% 0 0;
+            box-shadow: 0 -4px 10px rgba(251, 146, 60, 0.1);
         }
-        ::-webkit-scrollbar-track {
-            background: #fff5e6;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #ffcc80;
-            border-radius: 10px;
+        .detail-card::after {
+            content: '';
+            position: absolute;
+            top: -25px;
+            right: 30px;
+            width: 60px;
+            height: 50px;
+            background-color: white;
+            border-radius: 50% 50% 0 0;
+            box-shadow: 0 -4px 10px rgba(251, 146, 60, 0.1);
         }
     </style>
 </head>
@@ -39,36 +52,40 @@
         const { useState, useEffect, useCallback, useRef } = React;
         const { motion, AnimatePresence } = window.Motion;
 
-        // --- Symbol 安定ノードリスト (symbolnodes.org 参照) ---
+        // --- 設定 ---
         const STABLE_NODES = [
             "https://symbol-sakura-16.next-web-technology.com:3001",
             "https://symbol.ea-node.com:3001",
             "https://xym-test.all-nodes.com:3001",
             "https://node.xym.jp:3001",
-            "https://all-nodes-01.symbol.network:3001",
             "https://dual-1.nodes-xym.work:3001"
         ];
 
-        // --- インラインSVGアイコン ---
+        // --- アイコンコンポーネント (インラインSVG) ---
         const Icon = ({ name, size = 24, className = "" }) => {
             const icons = {
-                Database: <path d="M3 5V19C3 20.66 7.03 22 12 22C16.97 22 21 20.66 21 19V5M3 5C3 6.66 7.03 8 12 8C16.97 8 21 6.66 21 5M3 5C3 3.34 7.03 2 12 2C16.97 2 21 3.34 21 5M3 12C3 13.66 7.03 15 12 15C16.97 15 21 13.66 21 12" />,
-                RefreshCw: <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 21v-5h5" />,
-                Hash: <path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" />,
-                Box: <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12" />,
-                Send: <path d="m22 2-7 20-4-9-9-4Z M22 2 11 13" />,
-                Wifi: <path d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M12 20h.01" />,
-                WifiOff: <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 13M5 13a10.94 10.94 0 0 1 2.28-1.94M10.71 10.71a5 5 0 0 1 4.79 4.79M8.5 16.5c.37-.37.78-.68 1.22-.92M12 20h.01" />,
-                Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                Database: <><path d="M3 5V19C3 20.66 7.03 22 12 22C16.97 22 21 20.66 21 19V5M3 5C3 6.66 7.03 8 12 8C16.97 8 21 6.66 21 5M3 5C3 3.34 7.03 2 12 2C16.97 2 21 3.34 21 5M3 12C3 13.66 7.03 15 12 15C16.97 15 21 13.66 21 12" /></>,
+                RefreshCw: <><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 21v-5h5" /></>,
+                Hash: <><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" /></>,
+                Box: <><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12" /></>,
+                Send: <><path d="m22 2-7 20-4-9-9-4Z M22 2 11 13" /></>,
+                User: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+                ArrowLeft: <><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></>,
+                Fish: <><path d="M2 12c.6.6 2.25 2 3.5 2 1.3 0 1.9-1.4 3.5-1.4s2.2 1.4 3.5 1.4 2.9-1.4 3.5-1.4 1.3.4 2 1c.7.6 1.3 1 2.5 1 1.2 0 2.4-.4 3.5-1L22 12l-1.5-1.5c-1.1-.6-2.3-1-3.5-1-1.2 0-1.8.4-2.5 1-.7.6-1.4 1-2 1s-2.2-1.4-3.5-1.4-2.2 1.4-3.5 1.4-2.2-1.4-3.5-1.4C3.25 10 2.6 11.4 2 12Z" /><path d="M22 12c-3 0-6-4-6-4s-3 4-6 4" /></>,
+                Clock: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
+                ChevronDown: <><path d="m6 9 6 6 6-6" /></>,
+                Zap: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></>,
+                Wifi: <><path d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M12 20h.01" /></>,
+                WifiOff: <><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 13M5 13a10.94 10.94 0 0 1 2.28-1.94M10.71 10.71a5 5 0 0 1 4.79 4.79M8.5 16.5c.37-.37.78-.68 1.22-.92M12 20h.01" /></>
             };
             return (
                 <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {icons[name]}
+                    {icons[name] || <circle cx="12" cy="12" r="10" />}
                 </svg>
             );
         };
 
-        // --- デフォルメ猫 SVG ---
+        // --- 歩くデフォルメ猫 SVG ---
         const DeformedCat = ({ color = "#f97316", type = "face", className = "" }) => {
             if (type === "face") {
                 return (
@@ -85,9 +102,23 @@
                     <rect x="25" y="40" width="50" height="35" rx="15" />
                     <path d="M30,40 Q30,25 50,25 T70,40" />
                     <path d="M35,28 L30,10 L45,25 Z" /><path d="M65,28 L70,10 L55,25 Z" />
-                    <path d="M75,55 Q90,45 85,30" fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" />
+                    <motion.path 
+                        animate={{ rotate: [-10, 10, -10] }}
+                        transition={{ repeat: Infinity, duration: 1 }}
+                        d="M75,55 Q90,45 85,30" fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" 
+                    />
                     <circle cx="42" cy="38" r="2" fill="black" /><circle cx="58" cy="38" r="2" fill="black" />
-                    <circle cx="35" cy="75" r="5" /><circle cx="65" cy="75" r="5" />
+                    
+                    <motion.circle 
+                        animate={{ x: [-2, 2, -2], y: [0, -3, 0] }}
+                        transition={{ repeat: Infinity, duration: 0.4 }}
+                        cx="35" cy="75" r="5" 
+                    />
+                    <motion.circle 
+                        animate={{ x: [2, -2, 2], y: [0, -3, 0] }}
+                        transition={{ repeat: Infinity, duration: 0.4 }}
+                        cx="65" cy="75" r="5" 
+                    />
                 </svg>
             );
         };
@@ -98,31 +129,29 @@
             const [transactions, setTransactions] = useState([]);
             const [latestHeight, setLatestHeight] = useState(0);
             const [isLoading, setIsLoading] = useState(true);
-            const [error, setError] = useState(null);
             const [catEvents, setCatEvents] = useState([]);
             const [notifications, setNotifications] = useState([]);
+            const [selectedItem, setSelectedItem] = useState(null);
+            const [isDetailLoading, setIsDetailLoading] = useState(false);
 
             const nodeUrl = STABLE_NODES[nodeIndex];
-            const notificationIdCounter = useRef(0);
 
             const addNotification = (message) => {
-                const id = notificationIdCounter.current++;
+                const id = Math.random();
                 setNotifications(prev => [{ id, message }, ...prev].slice(0, 3));
                 setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 4000);
             };
 
             const triggerCat = (type, detail = "") => {
-                const id = Math.random().toString(36).substr(2, 9);
-                const yPos = Math.random() * 50 + 20;
+                const id = Math.random();
+                const yPos = Math.random() * 40 + 20; 
                 setCatEvents(prev => [...prev, { id, type, detail, yPos, catType: type === 'block' ? 'full' : 'face' }]);
-                setTimeout(() => setCatEvents(prev => prev.filter(c => c.id !== id)), 6000);
+                setTimeout(() => setCatEvents(prev => prev.filter(c => c.id !== id)), 12500);
             };
 
             const syncBlockchain = useCallback(async () => {
-                setIsLoading(true);
                 try {
                     const res = await fetch(`${nodeUrl}/chain/info`);
-                    if (!res.ok) throw new Error();
                     const chainInfo = await res.json();
                     const currentHeight = parseInt(chainInfo.height);
 
@@ -141,16 +170,13 @@
                     const newTxs = txData.data || [];
 
                     if (transactions.length > 0 && newTxs.length > 0 && newTxs[0].meta.hash !== transactions[0].meta.hash) {
-                        addNotification("新しい送金を検知したニャ！");
+                        addNotification("新しいTXを検知したニャ！");
                         triggerCat('tx', "Transaction");
                     }
                     setTransactions(newTxs);
-                    setError(null);
-                } catch (err) {
-                    setError("Search Node...");
-                    setNodeIndex((prev) => (prev + 1) % STABLE_NODES.length);
-                } finally {
                     setIsLoading(false);
+                } catch (err) {
+                    setNodeIndex((prev) => (prev + 1) % STABLE_NODES.length);
                 }
             }, [nodeUrl, latestHeight, transactions.length]);
 
@@ -160,135 +186,188 @@
                 return () => clearInterval(interval);
             }, [syncBlockchain]);
 
+            const viewDetail = async (type, id) => {
+                setSelectedItem({ type, id, data: null });
+                setIsDetailLoading(true);
+                try {
+                    let data = null;
+                    if (type === 'block') {
+                        const res = await fetch(`${nodeUrl}/blocks/${id}`);
+                        data = await res.json();
+                    } else if (type === 'tx') {
+                        const res = await fetch(`${nodeUrl}/transactions/confirmed/${id}`);
+                        data = await res.json();
+                    } else if (type === 'account') {
+                        const res = await fetch(`${nodeUrl}/accounts/${id}`);
+                        data = await res.json();
+                        const mRes = await fetch(`${nodeUrl}/accounts/${id}/mosaics`);
+                        data.mosaics = await mRes.json();
+                    }
+                    setSelectedItem({ type, id, data });
+                } catch (e) {
+                    addNotification("データが見つからないニャ...");
+                } finally {
+                    setIsDetailLoading(false);
+                }
+            };
+
             return (
                 <div className="min-h-screen text-slate-700 pb-12 overflow-x-hidden relative">
-                    {/* 背景デコレーション */}
-                    <div className="fixed inset-0 pointer-events-none opacity-[0.08] overflow-hidden select-none">
-                        <DeformedCat type="face" className="absolute top-10 left-10 w-48 h-48 rotate-12" />
-                        <DeformedCat type="full" className="absolute bottom-20 right-10 w-64 h-64 -rotate-12" />
-                        <div className="absolute top-1/2 left-1/4 text-9xl text-orange-300 opacity-20">🐾</div>
-                        <div className="absolute top-1/3 right-1/3 text-7xl text-orange-200 opacity-40">🐾</div>
-                    </div>
-
-                    {/* ヘッダー */}
                     <header className="bg-white/90 backdrop-blur-md border-b-8 border-orange-100 sticky top-0 z-50 px-6 py-4 shadow-sm flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <motion.div animate={{ rotate: [0, -10, 10, 0] }} transition={{ repeat: Infinity, duration: 4 }} className="bg-orange-500 p-2 rounded-2xl text-white shadow-lg shadow-orange-100">
+                        <div className="flex items-center gap-4 cursor-pointer" onClick={() => setSelectedItem(null)}>
+                            <motion.div animate={{ rotate: [0, -10, 10, 0] }} transition={{ repeat: Infinity, duration: 4 }} className="bg-orange-500 p-2 rounded-2xl text-white shadow-lg">
                                 <DeformedCat type="face" color="white" className="w-10 h-10" />
                             </motion.div>
-                            <div>
-                                <h1 className="text-xl md:text-2xl font-black text-orange-600 uppercase italic leading-none tracking-tighter">Neko Explorer</h1>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <div className={`flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${error ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                                        <Icon name={error ? "WifiOff" : "Wifi"} size={10} />
-                                        {error ? 'Search' : 'Live'}
-                                    </div>
-                                    <span className="text-[9px] font-mono text-slate-400 truncate max-w-[150px]">{nodeUrl}</span>
-                                </div>
-                            </div>
+                            <h1 className="text-xl md:text-2xl font-black text-orange-600 uppercase italic tracking-tighter leading-none">Neko Explorer</h1>
                         </div>
-                        <button onClick={syncBlockchain} className="bg-orange-500 text-white p-3 rounded-2xl shadow-md hover:bg-orange-600 active:scale-95 transition-all">
-                            <Icon name="RefreshCw" size={20} className={isLoading ? "animate-spin" : ""} />
-                        </button>
+                        <button onClick={syncBlockchain} className="bg-orange-500 text-white p-3 rounded-2xl shadow-md hover:bg-orange-600 active:scale-95"><Icon name="RefreshCw" size={20} className={isLoading ? "animate-spin" : ""} /></button>
                     </header>
 
                     <main className="max-w-6xl mx-auto px-6 py-8">
-                        {/* アニメーションステージ */}
-                        <div className="relative h-64 w-full mb-10 overflow-hidden rounded-[3rem] bg-white border-8 border-orange-100/50 shadow-inner">
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 text-center">
-                                <div className="text-8xl mb-2 text-orange-200">🐾</div>
-                                <p className="font-black text-orange-400 tracking-[0.5em]">Neko Playground</p>
-                            </div>
-                            <AnimatePresence>
-                                {catEvents.map((cat) => (
-                                    <motion.div key={cat.id} initial={{ x: -150, y: cat.yPos, opacity: 0 }} animate={{ x: '110vw', opacity: 1 }} transition={{ duration: 5, ease: "linear" }} className="absolute z-20 pointer-events-none">
-                                        <motion.div animate={{ y: [0, -20, 0] }} transition={{ repeat: Infinity, duration: 0.6, ease: "easeOut" }} className="relative text-center">
-                                            <div className="bg-white px-3 py-1 rounded-full shadow-lg border-2 border-orange-200 text-[10px] font-black mb-1">
-                                                {cat.type === 'block' ? '📦 BLOCK!' : '✨ TX!'}
-                                            </div>
-                                            <DeformedCat type={cat.catType} color={cat.type === 'block' ? '#f97316' : '#fb923c'} className="w-24 h-24 filter drop-shadow-lg" />
-                                            <div className="absolute -bottom-2 -right-4 text-3xl">{cat.type === 'block' ? '🎁' : '🐟'}</div>
-                                        </motion.div>
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
-                        </div>
-
-                        {/* スタッツ */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                            <StatCard icon="Hash" title="Height" value={latestHeight || "..."} cat="face" color="text-orange-500" />
-                            <StatCard icon="Box" title="Blocks" value={blocks.length} cat="full" color="text-pink-500" />
-                            <StatCard icon="Send" title="Transactions" value={transactions.length} cat="face" color="text-blue-500" />
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                            {/* ブロックリスト */}
-                            <section className="bg-white rounded-[3rem] p-8 shadow-xl border-t-8 border-orange-200">
-                                <h2 className="text-xl font-black flex items-center gap-3 mb-8 text-orange-600 underline decoration-orange-100 decoration-8 underline-offset-4">Recent Blocks</h2>
-                                <div className="space-y-4">
-                                    {blocks.length === 0 ? <div className="animate-pulse h-20 bg-slate-50 rounded-3xl" /> : blocks.map((b) => (
-                                        <div key={b.meta.hash} className="bg-orange-50/50 p-5 rounded-[2.5rem] flex items-center justify-between border-2 border-transparent hover:border-orange-100 hover:bg-white transition-all shadow-sm">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center font-black text-orange-500 border border-orange-50 shadow-inner">#{b.block.height.toString().slice(-3)}</div>
-                                                <div className="text-sm font-black">Height: {b.block.height}</div>
-                                            </div>
-                                            <span className="bg-orange-500 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-sm">{b.block.transactionsCount} TXs</span>
-                                        </div>
-                                    ))}
+                        {!selectedItem ? (
+                            <>
+                                <div className="relative h-80 w-full mb-10 overflow-hidden rounded-[3.5rem] bg-white border-8 border-orange-100/50 shadow-inner">
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 text-center">
+                                        <div className="text-8xl mb-2 text-orange-200">🐾</div>
+                                        <p className="font-black text-orange-400 tracking-[0.5em]">Neko Playground</p>
+                                    </div>
+                                    <AnimatePresence>
+                                        {catEvents.map((cat) => (
+                                            <motion.div key={cat.id} initial={{ x: -200, y: cat.yPos + "%", opacity: 0 }} animate={{ x: '120vw', opacity: 1 }} transition={{ duration: 12, ease: "linear" }} className="absolute z-20 pointer-events-none">
+                                                <motion.div animate={{ y: [0, -15, 0] }} transition={{ repeat: Infinity, duration: 0.6, ease: "easeOut" }} className="relative text-center">
+                                                    <div className="bg-white px-4 py-2 rounded-full shadow-lg border-2 border-orange-200 text-[11px] font-black mb-2 inline-block whitespace-nowrap">
+                                                        {cat.type === 'block' ? '📦 NEW BLOCK!' : '✨ NEW TX!'}
+                                                    </div>
+                                                    <DeformedCat type={cat.catType} color={cat.type === 'block' ? '#f97316' : '#fb923c'} className="w-32 h-32 filter drop-shadow-xl" />
+                                                    <div className="absolute -bottom-2 -right-6 text-4xl">{cat.type === 'block' ? '🎁' : '🐟'}</div>
+                                                </motion.div>
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
                                 </div>
-                            </section>
 
-                            {/* TXリスト */}
-                            <section className="bg-white rounded-[3rem] p-8 shadow-xl border-t-8 border-blue-200">
-                                <h2 className="text-xl font-black flex items-center gap-3 mb-8 text-blue-600 underline decoration-blue-100 decoration-8 underline-offset-4">Recent Transactions</h2>
-                                <div className="space-y-4">
-                                    {transactions.length === 0 ? <div className="animate-pulse h-20 bg-slate-50 rounded-3xl" /> : transactions.map((t) => (
-                                        <div key={t.meta.hash} className="bg-blue-50/50 p-5 rounded-[2.5rem] flex items-center justify-between border-2 border-transparent hover:border-blue-100 hover:bg-white transition-all shadow-sm">
-                                            <div className="flex items-center gap-4 min-w-0">
-                                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-2xl border border-blue-50 shadow-inner">🐟</div>
-                                                <div className="min-w-0">
-                                                    <div className="text-sm font-black text-blue-600 truncate max-w-[120px]">Type: {t.transaction.type}</div>
-                                                    <div className="text-[9px] text-slate-400 font-mono truncate">{t.meta.hash}</div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                                    <StatCard icon="Hash" title="Height" value={latestHeight || "..."} color="text-orange-500" />
+                                    <StatCard icon="Box" title="Blocks" value={blocks.length} color="text-pink-500" />
+                                    <StatCard icon="Send" title="TXs" value={transactions.length} color="text-blue-500" />
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                                    <section className="bg-white rounded-[3rem] p-8 shadow-xl border-t-8 border-orange-200">
+                                        <h2 className="text-xl font-black flex items-center gap-3 mb-8 text-orange-600 underline decoration-orange-100 decoration-8 underline-offset-4">Recent Blocks</h2>
+                                        <div className="space-y-4">
+                                            {blocks.map((b) => (
+                                                <div key={b.meta.hash} onClick={() => viewDetail('block', b.block.height)} className="cursor-pointer bg-orange-50/50 p-5 rounded-[2.5rem] flex items-center justify-between border-2 border-transparent hover:border-orange-200 hover:bg-white transition-all shadow-sm">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center font-black text-orange-600 border border-orange-50 shadow-inner">#{b.block.height.toString().slice(-3)}</div>
+                                                        <div className="text-sm font-black">Height: {b.block.height}</div>
+                                                    </div>
+                                                    <Icon name="ChevronDown" size={16} className="-rotate-90 text-orange-300" />
                                                 </div>
-                                            </div>
-                                            <div className="text-[9px] font-bold text-slate-300">#{t.meta.height}</div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    </section>
+                                    <section className="bg-white rounded-[3rem] p-8 shadow-xl border-t-8 border-blue-200">
+                                        <h2 className="text-xl font-black flex items-center gap-3 mb-8 text-blue-600 underline decoration-blue-100 decoration-8 underline-offset-4">Recent TXs</h2>
+                                        <div className="space-y-4">
+                                            {transactions.map((t) => (
+                                                <div key={t.meta.hash} onClick={() => viewDetail('tx', t.meta.hash)} className="cursor-pointer bg-blue-50/50 p-5 rounded-[2.5rem] flex items-center justify-between border-2 border-transparent hover:border-blue-100 hover:bg-white transition-all shadow-sm">
+                                                    <div className="flex items-center gap-4 min-w-0">
+                                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-2xl border border-blue-50 shadow-inner">🐟</div>
+                                                        <div className="min-w-0"><div className="text-sm font-black text-blue-600 truncate max-w-[120px]">Type: {t.transaction.type}</div><div className="text-[9px] text-slate-400 font-mono truncate">{t.meta.hash}</div></div>
+                                                    </div>
+                                                    <Icon name="ChevronDown" size={16} className="-rotate-90 text-blue-300" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
                                 </div>
-                            </section>
-                        </div>
+                            </>
+                        ) : (
+                            <div className="max-w-4xl mx-auto">
+                                <button onClick={() => setSelectedItem(null)} className="mb-6 flex items-center gap-2 text-orange-600 font-bold hover:translate-x-[-4px] transition-transform">
+                                    <Icon name="ArrowLeft" size={20} /> Playgroundに戻る
+                                </button>
+                                {isDetailLoading ? (
+                                    <div className="text-center py-20">
+                                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="inline-block mb-4"><DeformedCat type="face" className="w-20 h-20" /></motion.div>
+                                        <p className="font-black text-orange-400 animate-pulse">猫がデータを一生懸命掘り出してるニャ...</p>
+                                    </div>
+                                ) : (
+                                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="relative bg-white rounded-[3.5rem] p-10 shadow-2xl detail-card border-4 border-orange-100">
+                                        <div className="flex justify-between items-start mb-8">
+                                            <div>
+                                                <span className="bg-orange-100 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{selectedItem.type} Details</span>
+                                                <h2 className="text-2xl md:text-3xl font-black text-slate-800 mt-2 break-all leading-tight">{selectedItem.id}</h2>
+                                            </div>
+                                            <DeformedCat type="face" className="w-20 h-20 opacity-20" />
+                                        </div>
+                                        <div className="space-y-6">
+                                            {selectedItem.type === 'block' && selectedItem.data && (
+                                                <>
+                                                    <DetailRow label="ハッシュ" value={selectedItem.data.meta.hash} isMono />
+                                                    <DetailRow label="生成した猫 (Harvester)" value={selectedItem.data.block.signerPublicKey} isMono isLink onClick={() => viewDetail('account', selectedItem.data.block.signerPublicKey)} />
+                                                    <DetailRow label="トランザクション数" value={selectedItem.data.block.transactionsCount} />
+                                                    <DetailRow label="時刻" value={new Date(parseInt(selectedItem.data.block.timestamp) + 1615853185000).toLocaleString()} />
+                                                </>
+                                            )}
+                                            {selectedItem.type === 'tx' && selectedItem.data && (
+                                                <>
+                                                    <DetailRow label="送信元猫" value={selectedItem.data.transaction.signerPublicKey} isMono isLink onClick={() => viewDetail('account', selectedItem.data.transaction.signerPublicKey)} />
+                                                    <DetailRow label="タイプ" value={selectedItem.data.transaction.type} />
+                                                    <DetailRow label="承認時の高さ" value={selectedItem.data.meta.height} isLink onClick={() => viewDetail('block', selectedItem.data.meta.height)} />
+                                                </>
+                                            )}
+                                            {selectedItem.type === 'account' && selectedItem.data && (
+                                                <>
+                                                    <div className="bg-orange-50 rounded-[2rem] p-6 mb-6 flex items-center justify-between">
+                                                        <div><p className="text-[10px] font-black uppercase text-orange-400">Neko Balance</p><p className="text-3xl font-black text-orange-600">XYM お財布</p></div>
+                                                        <Icon name="Fish" size={40} className="text-orange-300" />
+                                                    </div>
+                                                    <h3 className="font-black text-lg text-slate-700 flex items-center gap-2 mb-4"><Icon name="Fish" className="text-orange-400" /> 持っているお魚 (Mosaics)</h3>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        {selectedItem.data.mosaics?.map((m, idx) => (
+                                                            <div key={idx} className="bg-slate-50 p-4 rounded-2xl border-2 border-transparent hover:border-orange-100 transition-all">
+                                                                <p className="text-[10px] font-mono text-slate-400">Mosaic ID: {m.id}</p>
+                                                                <p className="text-lg font-black text-slate-700 mt-1">{m.amount / 1000000} <span className="text-[10px] opacity-50 tracking-tighter">Units</span></p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </div>
+                        )}
                     </main>
 
-                    {/* 通知ポップアップ */}
                     <div className="fixed bottom-8 left-8 z-[100] flex flex-col gap-3 pointer-events-none">
                         <AnimatePresence>
                             {notifications.map((n) => (
                                 <motion.div key={n.id} initial={{ x: -100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -100, opacity: 0 }} 
                                     className="bg-white p-4 rounded-[2rem] shadow-2xl flex items-center gap-4 border-4 border-orange-100 pointer-events-auto">
-                                    <DeformedCat type="face" className="w-12 h-12" />
-                                    <div className="text-xs font-black leading-tight pr-4">{n.message}</div>
+                                    <DeformedCat type="face" className="w-12 h-12" /><div className="text-xs font-black pr-4">{n.message}</div>
                                 </motion.div>
                             ))}
                         </AnimatePresence>
                     </div>
-
-                    <footer className="mt-20 py-24 bg-white border-t-8 border-orange-50 text-center flex flex-col items-center gap-4 opacity-50 grayscale pointer-events-none italic">
-                        <DeformedCat type="full" className="w-16 h-16" />
-                        <p className="text-[10px] font-black tracking-widest uppercase tracking-[0.4em]">Symbol Cat Community 🐾</p>
-                    </footer>
                 </div>
             );
         };
 
-        const StatCard = ({ icon, title, value, sub, color, cat }) => (
-            <div className="bg-white p-6 rounded-[3rem] shadow-xl border-4 border-orange-50 relative overflow-hidden group">
-                <div className="flex items-center gap-3 mb-4 relative z-10">
-                    <div className={`p-2 bg-slate-50 rounded-xl ${color}`}><Icon name={icon} size={20} /></div>
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-50">{title}</span>
-                </div>
-                <div className="text-3xl font-black tracking-tighter relative z-10 text-slate-800">{value}</div>
-                <div className="text-[9px] font-bold text-slate-300 italic relative z-10">{sub}</div>
-                <div className="absolute -bottom-4 -right-4 w-28 h-28 opacity-[0.1] group-hover:scale-110 transition-transform duration-500"><DeformedCat type={cat} /></div>
+        const DetailRow = ({ label, value, isMono = false, isLink = false, onClick = null }) => (
+            <div className="border-b border-orange-50 pb-4">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">{label}</p>
+                <p onClick={onClick} className={`mt-2 text-sm font-bold break-all ${isMono ? 'font-mono text-[12px]' : ''} ${isLink ? 'text-orange-500 cursor-pointer hover:underline' : 'text-slate-700'}`}>{value}</p>
+            </div>
+        );
+
+        const StatCard = ({ icon, title, value, color }) => (
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border-4 border-orange-50 flex items-center gap-4 relative overflow-hidden group">
+                <div className={`p-3 bg-slate-50 rounded-2xl ${color}`}><Icon name={icon} /></div>
+                <div><p className="text-[10px] font-black uppercase opacity-50 tracking-widest leading-none">{title}</p><p className="text-2xl font-black mt-1 leading-none">{value}</p></div>
+                <div className="absolute -bottom-4 -right-4 w-20 h-20 opacity-[0.05] group-hover:scale-110 transition-transform"><DeformedCat type="face" /></div>
             </div>
         );
 
