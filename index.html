@@ -38,7 +38,7 @@
     <script type="text/babel">
         const { useState, useEffect, useCallback, useRef } = React;
 
-        // --- Symbol 設定 (信頼性の高いHTTPSノード) ---
+        // --- Symbol 設定 (HTTPS対応の安定ノード) ---
         const NODE_CANDIDATES = [
             "https://symbol-sakura-16.next-web-technology.com:3001",
             "https://xym.town:3001",
@@ -73,9 +73,9 @@
         const hexToAddress = (hex) => {
             if (!hex) return "---";
             // すでにBase32アドレス（長さ39）の場合はそのまま返す
-            if (hex.length === 39 && hex.startsWith('N')) return hex;
-            // Hex形式アドレス（48文字）の場合のみ変換
-            if (hex.length !== 48) return hex;
+            if (typeof hex === 'string' && hex.length === 39 && hex.startsWith('N')) return hex;
+            // Hex形式アドレス（48文字）の場合のみ変換を試みる
+            if (typeof hex !== 'string' || hex.length !== 48) return hex;
 
             const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
             try {
@@ -114,12 +114,12 @@
                     if (!match) return null;
                     const bytes = new Uint8Array(match.map(byte => parseInt(byte, 16)));
                     return new TextDecoder().decode(bytes);
-                } catch(e) { return "Binary Data"; }
+                } catch(e) { return null; }
             }
             return "Encrypted Message";
         };
 
-        // --- アイコンコンポーネント ---
+        // --- アイコン ---
         const Icon = ({ name, size = 24, className = "" }) => {
             const icons = {
                 Database: <path d="M3 5V19C3 20.1 5.24 21 8 21C10.76 21 13 20.1 13 19V5C13 3.9 10.76 3 8 3C5.24 3 3 3.9 3 5Z M3 5C3 6.1 5.24 7 8 7C10.76 7 13 6.1 13 5 M3 12C3 13.1 5.24 14 8 14C10.76 14 13 13.1 13 12 M21 5V19C21 20.1 18.76 21 16 21C13.24 21 11 20.1 11 19 M21 5C21 6.1 18.76 7 16 7C13.24 7 11 6.1 11 5 M11 12C11 13.1 13.24 14 16 14C18.76 14 21 13.1 21 12" />,
@@ -153,6 +153,7 @@
                     <svg viewBox={viewBox} className="w-full h-full drop-shadow-sm transition-all duration-300">
                         {mode === "full" && (
                             <React.Fragment>
+                                {/* しっぽ: 左側 */}
                                 <path d="M22 65 Q 6 65 6 40" stroke={color} strokeWidth="10" fill="none" strokeLinecap="round" />
                                 <rect x="34" y="80" width="10" height="10" rx="5" fill={color} />
                                 <rect x="56" y="80" width="10" height="10" rx="5" fill={color} />
@@ -271,7 +272,7 @@
                     try {
                         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents: [{ parts: [{ text: `Symbolブロック #${newHeight} 到着！案内猫として可愛い一言を15文字以内で。語尾〜だにゃ！` }] }] })
+                            body: JSON.stringify({ contents: [{ parts: [{ text: `Symbolブロック #${newHeight} 到着！案内猫の一言（15文字）。語尾〜だにゃ！` }] }] })
                         });
                         const data = await res.json();
                         return data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -323,7 +324,7 @@
                         ]);
                         
                         const blockData = await bRes.json().catch(() => null);
-                        if (blockData && blockData.data) {
+                        if (blockData && blockData.data && Array.isArray(blockData.data)) {
                             setBlocks(blockData.data.map(b => b ? {
                                 id: b.block?.height || "---", 
                                 time: formatSymbolTimestamp(b.block?.timestamp), 
@@ -332,12 +333,13 @@
                         }
 
                         const txData = await tRes.json().catch(() => null);
-                        if (txData && txData.data) {
+                        if (txData && txData.data && Array.isArray(txData.data)) {
                             const mappedTxs = txData.data.map(t => {
                                 if (!t) return null;
-                                // ★修正: signerAddress (Hexアドレス 48文字) を取得しBase32に変換
-                                const rawFromHexAddress = t.meta?.signerAddress;
-                                const fromAddress = rawFromHexAddress ? hexToAddress(rawFromHexAddress) : "---";
+                                // ★修正: 送信者アドレス（Hex形式）を取得しBase32に変換
+                                // 優先順位: meta.signerAddress > transaction.signerAddress > その他
+                                const hexFrom = t.meta?.signerAddress || t.transaction?.signerAddress;
+                                const fromAddress = hexFrom ? hexToAddress(hexFrom) : "---";
                                 
                                 return {
                                     id: t.meta?.hash || "---", 
@@ -348,7 +350,6 @@
                                     block: "#" + (t.meta?.height || "---")
                                 };
                             }).filter(Boolean);
-                            
                             setTxs(mappedTxs);
                             if (prevH > 0 && mappedTxs.length > 0) triggerNeko(newHeight, mappedTxs[0].message);
                         }
@@ -378,6 +379,7 @@
                 <div className="min-h-screen p-4 md:p-8 selection:bg-orange-100 overflow-x-hidden text-slate-700">
                     <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 px-2">
                         <div className="flex items-center gap-4">
+                            {/* 左上の猫: 顔のみ */}
                             <div className={`w-14 h-14 bg-[#F47A42] rounded-[1.2rem] flex items-center justify-center shadow-lg cursor-pointer relative ${audioBlocked ? 'ring-4 ring-orange-200 audio-ready-pulse' : ''}`} onClick={() => { playNyariin(); setAudioBlocked(false); }}>
                                 <CustomCat className="w-10 h-10 p-1" color="white" expression={headerExpression} mode="face" />
                                 {audioBlocked && <div className="absolute top-0 right-0 p-1 bg-white rounded-bl-lg text-orange-500 shadow-sm"><Icon name="Volume2" size={12} /></div>}
@@ -387,7 +389,7 @@
                                 <div className="text-[10px] font-bold text-slate-300 truncate max-w-[150px] mt-1 font-mono">{activeNode === "Demo Mode" ? "DEMO MODE" : activeNode ? activeNode.replace('https://', '') : "ノードを探し中..." }</div>
                             </div>
                         </div>
-                        <button onClick={() => { setActiveNode(null); updateData(); }} className="w-12 h-12 flex items-center justify-center bg-[#F47A42] rounded-2xl text-white shadow-lg active:scale-95 transition-all text-shadow-none"><Icon name="RotateCcw" size={22} /></button>
+                        <button onClick={() => { setActiveNode(null); updateData(); }} className="w-12 h-12 flex items-center justify-center bg-[#F47A42] rounded-2xl text-white shadow-lg active:scale-95 transition-all"><Icon name="RotateCcw" size={22} /></button>
                     </header>
 
                     <section className="max-w-7xl mx-auto mb-10 px-2 text-slate-700">
@@ -448,7 +450,7 @@
                                 ))}
                             </div>
                         </div>
-                        <div className="bg-blue-50/10 rounded-[3rem] p-8 border border-blue-50/50 shadow-sm relative">
+                        <div className="bg-blue-50/10 rounded-[3rem] p-8 border border-blue-50/50 shadow-sm relative text-slate-700">
                             <h3 className="text-2xl font-black mb-8 flex items-center gap-3 tracking-tight text-slate-800"><Icon name="Send" size={24} className="text-blue-400" />Recent TXs</h3>
                             <div className="space-y-4">
                                 {txs.map((t, idx) => (
