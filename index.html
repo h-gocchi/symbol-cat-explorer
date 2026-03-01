@@ -14,7 +14,7 @@
         body { font-family: 'Inter', sans-serif; background-color: #FFFBF7; color: #475569; }
         .text-shadow-sm { text-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
-        /* 猫の歩行アニメーション */
+        /* 猫の歩行アニメーション: 確実に最後まで歩き切る */
         @keyframes walk-across {
             0% { left: -25%; opacity: 1; }
             95% { left: 120%; opacity: 1; }
@@ -38,7 +38,7 @@
     <script type="text/babel">
         const { useState, useEffect, useCallback, useRef } = React;
 
-        // --- Symbol 設定 (GitHub Pages対応のHTTPSノード) ---
+        // --- Symbol 設定 ---
         const NODE_CANDIDATES = [
             "https://symbol-sakura-16.next-web-technology.com:3001",
             "https://xym.town:3001",
@@ -47,7 +47,7 @@
             "https://nodes.symbol.community:3001"
         ];
         const SYMBOL_GENESIS_TIME = 1615853185;
-        const CHECK_INTERVAL = 30000; 
+        const CHECK_INTERVAL = 30000; // 約30秒に一度のSymbol速度に同期
 
         const apiKey = ""; 
         const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
@@ -102,11 +102,11 @@
             return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name] || null}</svg>;
         };
 
-        // --- 猫のキャラクター ---
+        // --- 猫のデザインコンポーネント ---
         const CustomCat = ({ className = "w-24 h-24", expression = "normal", isWalking = false, mode = "full", color = "#FBAE83" }) => {
             const viewBox = mode === "face" ? "24 20 52 35" : "0 0 100 100";
             return (
-                <div className={`${className} relative ${isWalking ? 'animate-bounce' : ''}`} style={{ animationDuration: '0.6s' }}>
+                <div className={`${className} relative ${isWalking ? 'animate-bounce' : ''}`}>
                     <svg viewBox={viewBox} className="w-full h-full drop-shadow-sm transition-all duration-300">
                         {mode === "full" && (
                             <React.Fragment>
@@ -132,7 +132,7 @@
                         <path d="M46 48 Q50 51 54 48" stroke="#555" strokeWidth="1.3" fill="none" />
                     </svg>
                     {mode === "full" && (
-                        /* プレゼント: 身体から離す（1mm） */
+                        /* プレゼント: 身体から1ミリ離す */
                         <div className="absolute bottom-5 -right-4 transform rotate-6 scale-[0.7]">
                             <div className="w-10 h-10 bg-[#E9D5B5] border-2 border-[#D8C2A2] rounded-md relative shadow-sm">
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2.5 h-full bg-[#E8A5AC]"></div>
@@ -186,7 +186,7 @@
             const audioRef = useRef(null);
             const heightRef = useRef(0);
 
-            // ノード探索 (STICKY NODE)
+            // ノード探索ロジック
             const findNode = async () => {
                 const shuffled = [...NODE_CANDIDATES].sort(() => Math.random() - 0.5);
                 for (let node of shuffled) {
@@ -236,6 +236,7 @@
                 }, 10500);
             };
 
+            // データ取得ロジックの修正（変数名不一致を解消）
             const updateData = useCallback(async () => {
                 let node = activeNode;
                 if (!node || node === "Demo Mode") {
@@ -243,7 +244,6 @@
                 }
 
                 if (!node) {
-                    // デモモード動作
                     const h = (heightRef.current || 5200000) + 1;
                     heightRef.current = h;
                     setHeight(h);
@@ -254,7 +254,7 @@
                 try {
                     const resInfo = await fetch(`${node}/chain/info`);
                     const info = await resInfo.json().catch(() => null);
-                    if (!info?.height) throw new Error("No height");
+                    if (!info?.height) throw new Error("Fetch failed");
                     
                     const newHeight = Number(info.height);
                     if (newHeight > heightRef.current) {
@@ -268,23 +268,28 @@
                         ]);
                         
                         const blockData = await bRes.json().catch(() => null);
-                        if (blockData?.data) {
+                        if (blockData?.data && Array.isArray(blockData.data)) {
                             setBlocks(blockData.data.map(b => ({
-                                id: b?.block?.height || "---", time: formatSymbolTimestamp(b?.block?.timestamp), hash: b?.meta?.hash
+                                id: b.block?.height || "---", 
+                                time: formatSymbolTimestamp(b.block?.timestamp), 
+                                hash: b.meta?.hash || "---"
                             })));
                         }
 
                         const txData = await tRes.json().catch(() => null);
-                        if (txData?.data) {
-                            const mapped = txData.data.map(t => ({
-                                id: t?.meta?.hash || "---", type: "Transfer", message: decodeHexMessage(t?.transaction?.message), block: "#" + (t?.meta?.height || "---")
+                        if (txData?.data && Array.isArray(txData.data)) {
+                            const mappedTxs = txData.data.map(t => ({
+                                id: t.meta?.hash || "---", 
+                                type: "Transfer", 
+                                message: decodeHexMessage(t.transaction?.message), 
+                                block: "#" + (t.meta?.height || "---")
                             }));
-                            setTxs(mapped);
-                            if (prevH > 0) triggerNeko(newHeight, mapped[0]?.message);
+                            setTxs(mappedTxs);
+                            if (prevH > 0) triggerNeko(newHeight, mappedTxs[0]?.message);
                         }
                     }
                 } catch (e) {
-                    setActiveNode(null); // 再探索を促す
+                    setActiveNode(null); 
                 }
             }, [activeNode]);
 
@@ -294,6 +299,7 @@
                 return () => clearInterval(timer);
             }, [updateData]);
 
+            // 表情変化
             useEffect(() => {
                 const timer = setInterval(() => {
                     const rand = Math.random();
@@ -308,7 +314,7 @@
                 <div className="min-h-screen p-4 md:p-8 selection:bg-orange-100 overflow-x-hidden">
                     <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 text-slate-700 px-2">
                         <div className="flex items-center gap-4">
-                            {/* 左上の猫: 顔のみ・表情あり */}
+                            {/* 左上の猫: 顔のみ表情ありに復元 */}
                             <div className={`w-14 h-14 bg-[#F47A42] rounded-[1.2rem] flex items-center justify-center shadow-lg cursor-pointer relative ${audioBlocked ? 'ring-4 ring-orange-200 audio-ready-pulse' : ''}`} onClick={() => { playNyariin(); setAudioBlocked(false); setHeaderExpression('happy'); }}>
                                 <CustomCat className="w-10 h-10 p-1" color="white" expression={headerExpression} mode="face" />
                                 {audioBlocked && <div className="absolute top-0 right-0 p-1 bg-white rounded-bl-lg text-orange-500"><Icon name="Volume2" size={12} /></div>}
@@ -318,12 +324,11 @@
                                 <div className="text-[10px] font-bold text-slate-300 truncate max-w-[150px] mt-1 font-mono">{activeNode === "Demo Mode" ? "DEMO MODE" : activeNode ? activeNode.replace('https://', '') : "ノードを探し中..." }</div>
                             </div>
                         </div>
-                        <button onClick={() => { setActiveNode(null); updateData(); }} className="w-12 h-12 flex items-center justify-center bg-[#F47A42] rounded-2xl text-white shadow-lg active:scale-95"><Icon name="RotateCcw" size={22} /></button>
+                        <button onClick={() => { setActiveNode(null); updateData(); }} className="w-12 h-12 flex items-center justify-center bg-[#F47A42] rounded-2xl text-white shadow-lg active:scale-95 transition-all"><Icon name="RotateCcw" size={22} /></button>
                     </header>
 
-                    <section className="max-w-7xl mx-auto mb-10 px-2 text-slate-700">
+                    <section className="max-w-7xl mx-auto mb-10 px-2">
                         <div className="bg-white rounded-[3rem] sm:rounded-[4rem] p-8 sm:p-16 relative overflow-hidden shadow-md border border-orange-50 flex flex-col items-center justify-center min-h-[350px] sm:min-h-[420px]">
-                            {/* 足跡背景: 9箇所 */}
                             <div className="absolute inset-0 pointer-events-none opacity-30">
                                 <PawPrint className="absolute top-10 left-10 w-20 h-20 rotate-12" /><PawPrint className="absolute bottom-16 left-20 w-24 h-24 rotate-6" />
                                 <PawPrint className="absolute top-1/2 left-[12%] w-14 h-14 rotate-180" /><PawPrint className="absolute top-12 right-24 w-18 h-18 rotate-45" />
@@ -345,7 +350,6 @@
                             )}
                             
                             {!isGenerating && <CustomCat className="w-24 h-24 absolute top-[70%] left-1/2 -translate-x-1/2 -mt-10" expression="normal" mode="full" />}
-
                             <h2 className="text-lg sm:text-2xl md:text-3xl font-black text-[#F9EAD8] tracking-widest sm:tracking-[0.5em] uppercase italic select-none mt-auto text-center px-4 w-full pointer-events-none">Neko Playground</h2>
                         </div>
                     </section>
@@ -362,7 +366,7 @@
                             <div className="space-y-4">
                                 {blocks.map((b, idx) => (
                                     <div key={idx} onClick={() => setModalContent({type:'block', data:b})} className="bg-white rounded-[2rem] p-6 shadow-sm flex items-center justify-between cursor-pointer hover:translate-x-1 transition-transform group border border-transparent hover:border-orange-100">
-                                        <div className="flex items-center gap-4"><div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform"><Icon name="CatFace" size={24} /></div><div><div className="text-xl font-black text-orange-500">#{b?.id || "---"}</div><div className="text-[10px] font-bold text-slate-300">{b?.time}</div></div></div><Icon name="ExternalLink" className="text-orange-200" />
+                                        <div className="flex items-center gap-4"><div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform"><Icon name="CatFace" size={24} /></div><div><div className="text-xl font-black text-orange-500">#{b.id || "---"}</div><div className="text-[10px] font-bold text-slate-300">{b.time}</div></div></div><Icon name="ExternalLink" className="text-orange-200" />
                                     </div>
                                 ))}
                             </div>
@@ -372,7 +376,7 @@
                             <div className="space-y-4">
                                 {txs.map((t, idx) => (
                                     <div key={idx} onClick={() => setModalContent({type:'tx', data:t})} className="bg-white rounded-[2rem] p-6 shadow-sm cursor-pointer hover:-translate-y-1 transition-transform border border-transparent hover:border-blue-100 group">
-                                        <div className="flex items-start gap-4"><div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-400 shrink-0 group-hover:rotate-12 transition-transform"><Icon name="Fish" size={24} /></div><div className="flex-1 min-w-0"><div className="font-black text-blue-500 mb-1 truncate text-sm">{t?.type}</div><div className="text-[9px] text-slate-300 truncate mb-1 font-mono">{t?.id}</div>{t?.message && <div className="p-2 bg-slate-50 rounded-lg text-[10px] italic font-bold text-slate-500">「{t?.message}」</div>}</div></div>
+                                        <div className="flex items-start gap-4"><div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-400 shrink-0 group-hover:rotate-12 transition-transform"><Icon name="Fish" size={24} /></div><div className="flex-1 min-w-0"><div className="font-black text-blue-500 mb-1 truncate text-sm">{t.type}</div><div className="text-[9px] text-slate-300 truncate mb-1 font-mono">{t.id}</div>{t.message && <div className="p-2 bg-slate-50 rounded-lg text-[10px] italic font-bold text-slate-500">「{t.message}」</div>}</div></div>
                                     </div>
                                 ))}
                             </div>
