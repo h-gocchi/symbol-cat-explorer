@@ -129,7 +129,15 @@
                 Fish: <React.Fragment><path d="M23 12c0 3.3-2.7 6-6 6-1.5 0-2.8-.5-3.9-1.5C11 18.5 8.5 20 6 20c-1.5 0-3-.5-4-1.5 1-1 1.5-2.5 1.5-4 0-2.5-1.5-5-1.5-6C3 7.5 4.5 7 6 7c2.5 0 5 1.5 7.1 3.5C14.2 9.5 15.5 9 17 9c3.3 0 6 2.7 6 6z" /><circle cx="18" cy="13" r="1" fill="white" /></React.Fragment>,
                 MessageSquare: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
                 User: <React.Fragment><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></React.Fragment>,
-                ShieldCheck: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+                ShieldCheck: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />,
+                CatFace: <React.Fragment>
+                    <path d="M7 10 L 5 3 L 11 8" />
+                    <path d="M17 10 L 19 3 L 13 8" />
+                    <circle cx="12" cy="13" r="8" />
+                    <path d="M3 13h3M3 15h3M18 13h3M18 15h3" />
+                    <circle cx="9" cy="13" r="1" fill="currentColor" />
+                    <circle cx="15" cy="13" r="1" fill="currentColor" />
+                </React.Fragment>
             };
             return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name] || null}</svg>;
         };
@@ -164,7 +172,6 @@
                         <path d="M46 48 Q50 51 54 48" stroke="#555" strokeWidth="1.3" fill="none" />
                     </svg>
                     {mode === "full" && (
-                        /* プレゼント: 身体から離す（1mm相当） */
                         <div className="absolute bottom-5 -right-4 transform rotate-6 scale-[0.7]">
                             <div className="w-10 h-10 bg-[#E9D5B5] border-2 border-[#D8C2A2] rounded-md relative shadow-sm">
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2.5 h-full bg-[#E8A5AC]"></div>
@@ -223,7 +230,7 @@
                 for (let node of shuffled) {
                     try {
                         const controller = new AbortController();
-                        const id = setTimeout(() => controller.abort(), 2500);
+                        const id = setTimeout(() => controller.abort(), 2000);
                         const res = await fetch(`${node}/chain/info`, { signal: controller.signal });
                         clearTimeout(id);
                         if (res.ok) {
@@ -287,10 +294,12 @@
                     node = await findNode();
                 }
 
-                if (!node) {
+                if (isDemoMode || !node) {
                     const h = (heightRef.current || 5200000) + 1;
                     heightRef.current = h;
                     setHeight(h);
+                    setBlocks(prev => [{ id: h, height: h, time: new Date().toLocaleTimeString(), hash: "DEMO_" + Math.random() }, ...prev.slice(0, 4)]);
+                    setTxs(prev => [{ id: "DEMO_TX", type: "Transfer", from: "NCM...123", to: "NRV...456", message: "Demo Active", block: "#" + h }, ...prev.slice(0, 4)]);
                     triggerNeko(h, "デモモードで散歩だにゃ！");
                     return;
                 }
@@ -311,27 +320,27 @@
                             fetch(`${node}/transactions/confirmed?limit=5&order=desc`)
                         ]);
                         
-                        const bData = await bRes.json().catch(() => null);
-                        if (bData && bData.data) {
-                            setBlocks(bData.data.map(b => ({
+                        const blockData = await bRes.json().catch(() => null);
+                        if (blockData && blockData.data) {
+                            setBlocks(blockData.data.map(b => b ? {
                                 id: b.block?.height || "---", 
                                 time: formatSymbolTimestamp(b.block?.timestamp), 
                                 hash: b.meta?.hash || "---"
-                            })));
+                            } : null).filter(Boolean));
                         }
 
-                        const tData = await tRes.json().catch(() => null);
-                        if (tData && tData.data) {
-                            const mappedTxs = tData.data.map(t => ({
-                                id: t?.meta?.hash || "---", 
+                        const txData = await tRes.json().catch(() => null);
+                        if (txData && txData.data) {
+                            const mappedTxs = txData.data.map(t => t ? {
+                                id: t.meta?.hash || "---", 
                                 type: "Transfer", 
-                                // SignerAddressを表示
-                                from: t?.meta?.signerAddress || t?.transaction?.signerPublicKey || "---",
-                                // RecipientAddressを表示（HexからBase32に変換）
-                                to: t?.transaction?.recipientAddress ? hexToAddress(t.transaction.recipientAddress) : "---",
-                                message: decodeHexMessage(t?.transaction?.message), 
-                                block: "#" + (t?.meta?.height || "---")
-                            }));
+                                // ★Fromをアドレスに修正 (meta.signerAddressが利用可能なためそれを使用)
+                                from: t.meta?.signerAddress || t.transaction?.signerPublicKey || "---",
+                                // ★Toをアドレスに修正
+                                to: t.transaction?.recipientAddress ? hexToAddress(t.transaction.recipientAddress) : "---",
+                                message: decodeHexMessage(t.transaction?.message), 
+                                block: "#" + (t.meta?.height || "---")
+                            } : null).filter(Boolean);
                             setTxs(mappedTxs);
                             if (prevH > 0 && mappedTxs.length > 0) triggerNeko(newHeight, mappedTxs[0].message);
                         }
@@ -339,7 +348,7 @@
                 } catch (e) {
                     setActiveNode(null); 
                 }
-            }, [activeNode]);
+            }, [activeNode, isDemoMode]);
 
             useEffect(() => {
                 const timer = setInterval(updateData, CHECK_INTERVAL);
@@ -395,7 +404,6 @@
                                 </div>
                             )}
                             
-                            {/* ★待機中の猫: 中央下方（修正済み：absolute bottom-8 left-1/2 を適用） */}
                             {!isGenerating && (
                                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
                                     <CustomCat className="w-24 h-24" expression="normal" mode="full" />
@@ -418,7 +426,14 @@
                             <div className="space-y-4">
                                 {blocks.map((b, idx) => (
                                     <div key={idx} onClick={() => setModalContent({type:'block', data:b})} className="bg-white rounded-[2rem] p-6 shadow-sm border border-orange-50/30 flex items-center justify-between group hover:shadow-md cursor-pointer transition-all hover:translate-x-1">
-                                        <div className="flex items-center gap-4"><div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform"><Icon name="CatFace" size={24} /></div><div><div className="text-xl font-black text-orange-500">#{b?.id || "---"}</div><div className="text-[10px] font-bold text-slate-300">{b?.time}</div></div></div><Icon name="ExternalLink" className="text-orange-200" />
+                                        <div className="flex items-center gap-4">
+                                            {/* ★ブロックリストの猫アイコンを復活 */}
+                                            <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
+                                                <Icon name="CatFace" size={24} />
+                                            </div>
+                                            <div><div className="text-xl font-black text-orange-500">#{b?.id || "---"}</div><div className="text-[10px] font-bold text-slate-300">{b?.time}</div></div>
+                                        </div>
+                                        <Icon name="ExternalLink" className="text-orange-200" />
                                     </div>
                                 ))}
                             </div>
@@ -427,13 +442,19 @@
                             <h3 className="text-2xl font-black mb-8 flex items-center gap-3 tracking-tight text-slate-800"><Icon name="Send" size={24} className="text-blue-400" />Recent TXs</h3>
                             <div className="space-y-4">
                                 {txs.map((t, idx) => (
-                                    <div key={idx} onClick={() => setModalContent({type:'tx', data:t})} className="bg-white rounded-[2rem] p-6 shadow-sm border border-blue-50/50 flex flex-col group cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1">
-                                        <div className="flex items-start gap-4"><div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-400 shrink-0 group-hover:rotate-12 transition-transform">🐟</div><div className="flex-1 min-w-0"><div className="font-black text-blue-500 mb-1 truncate text-sm">{t?.type}</div>
-                                        <div className="flex flex-col gap-0.5 mb-2 mt-1">
-                                            <div className="text-[8px] font-black text-slate-400 truncate">FROM: {t?.from}</div>
-                                            <div className="text-[8px] font-black text-slate-400 truncate">TO: {t?.to}</div>
+                                    <div key={idx} onClick={() => setModalContent({type:'tx', data:t})} className="bg-white rounded-[2rem] p-6 shadow-sm border border-blue-50/50 flex flex-col group cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1 text-slate-700">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-400 shrink-0 group-hover:rotate-12 transition-transform text-2xl">🐟</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-black text-blue-500 mb-1 truncate text-sm">{t?.type}</div>
+                                                <div className="flex flex-col gap-0.5 mb-2 mt-1">
+                                                    {/* ★FromとToをアドレスで表示するように修正 */}
+                                                    <div className="text-[8px] font-black text-slate-400 truncate">FROM: {t?.from}</div>
+                                                    <div className="text-[8px] font-black text-slate-400 truncate">TO: {t?.to}</div>
+                                                </div>
+                                                {t?.message && <div className="p-3 bg-slate-50 rounded-xl text-[10px] italic font-bold text-slate-600 border border-slate-100 leading-relaxed">「{t?.message}」</div>}
+                                            </div>
                                         </div>
-                                        {t?.message && <div className="p-3 bg-slate-50 rounded-xl text-[10px] italic font-bold text-slate-600 border border-slate-100">「{t?.message}」</div>}</div></div>
                                     </div>
                                 ))}
                             </div>
@@ -451,8 +472,8 @@
                             ) : (
                                 <React.Fragment>
                                     <DetailRow icon="Hash" label="Hash" value={modalContent?.data?.id} />
-                                    <DetailRow icon="User" label="From (Signer)" value={modalContent?.data?.from} />
-                                    <DetailRow icon="User" label="To (Recipient)" value={modalContent?.data?.to} />
+                                    <DetailRow icon="User" label="From" value={modalContent?.data?.from} />
+                                    <DetailRow icon="User" label="To" value={modalContent?.data?.to} />
                                     <DetailRow icon="Box" label="Block" value={modalContent?.data?.block} />
                                     {modalContent?.data?.message && <DetailRow icon="MessageSquare" label="Message" value={modalContent?.data?.message} />}
                                 </React.Fragment>
