@@ -230,7 +230,7 @@
                 for (let node of shuffled) {
                     try {
                         const controller = new AbortController();
-                        const id = setTimeout(() => controller.abort(), 2000);
+                        const id = setTimeout(() => controller.abort(), 2500);
                         const res = await fetch(`${node}/chain/info`, { signal: controller.signal });
                         clearTimeout(id);
                         if (res.ok) {
@@ -299,7 +299,7 @@
                     heightRef.current = h;
                     setHeight(h);
                     setBlocks(prev => [{ id: h, height: h, time: new Date().toLocaleTimeString(), hash: "DEMO_" + Math.random() }, ...prev.slice(0, 4)]);
-                    setTxs(prev => [{ id: "DEMO_TX", type: "Transfer", from: "NCM...123", to: "NRV...456", message: "Demo Active", block: "#" + h }, ...prev.slice(0, 4)]);
+                    setTxs(prev => [{ id: "DEMO_TX", type: "Transfer", from: "NCX...DEMO", to: "NDF...DEMO", message: "Demo Active", block: "#" + h }, ...prev.slice(0, 4)]);
                     triggerNeko(h, "デモモードで散歩だにゃ！");
                     return;
                 }
@@ -320,23 +320,22 @@
                             fetch(`${node}/transactions/confirmed?limit=5&order=desc`)
                         ]);
                         
-                        const blockData = await bRes.json().catch(() => null);
-                        if (blockData && blockData.data) {
-                            setBlocks(blockData.data.map(b => b ? {
+                        const bData = await bRes.json().catch(() => null);
+                        if (bData && bData.data) {
+                            setBlocks(bData.data.map(b => b ? {
                                 id: b.block?.height || "---", 
                                 time: formatSymbolTimestamp(b.block?.timestamp), 
                                 hash: b.meta?.hash || "---"
                             } : null).filter(Boolean));
                         }
 
-                        const txData = await tRes.json().catch(() => null);
-                        if (txData && txData.data) {
-                            const mappedTxs = txData.data.map(t => t ? {
+                        const tData = await tRes.json().catch(() => null);
+                        if (tData && tData.data) {
+                            const mappedTxs = tData.data.map(t => t ? {
                                 id: t.meta?.hash || "---", 
                                 type: "Transfer", 
-                                // ★Fromをアドレスに修正 (meta.signerAddressが利用可能なためそれを使用)
+                                // ★Fromをパブリックキーではなくアドレスに変更 (meta.signerAddressを使用)
                                 from: t.meta?.signerAddress || t.transaction?.signerPublicKey || "---",
-                                // ★Toをアドレスに修正
                                 to: t.transaction?.recipientAddress ? hexToAddress(t.transaction.recipientAddress) : "---",
                                 message: decodeHexMessage(t.transaction?.message), 
                                 block: "#" + (t.meta?.height || "---")
@@ -370,6 +369,7 @@
                 <div className="min-h-screen p-4 md:p-8 selection:bg-orange-100 overflow-x-hidden text-slate-700">
                     <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 px-2">
                         <div className="flex items-center gap-4">
+                            {/* 左上の猫: 顔のみ */}
                             <div className={`w-14 h-14 bg-[#F47A42] rounded-[1.2rem] flex items-center justify-center shadow-lg cursor-pointer relative ${audioBlocked ? 'ring-4 ring-orange-200 audio-ready-pulse' : ''}`} onClick={() => { playNyariin(); setAudioBlocked(false); }}>
                                 <CustomCat className="w-10 h-10 p-1" color="white" expression={headerExpression} mode="face" />
                                 {audioBlocked && <div className="absolute top-0 right-0 p-1 bg-white rounded-bl-lg text-orange-500 shadow-sm"><Icon name="Volume2" size={12} /></div>}
@@ -384,6 +384,7 @@
 
                     <section className="max-w-7xl mx-auto mb-10 px-2 text-slate-700">
                         <div className="bg-white rounded-[3rem] sm:rounded-[4rem] p-8 sm:p-16 relative overflow-hidden shadow-md border border-orange-50 flex flex-col items-center justify-center min-h-[350px] sm:min-h-[420px]">
+                            {/* 足跡背景 */}
                             <div className="absolute inset-0 pointer-events-none opacity-30">
                                 <PawPrint className="absolute top-10 left-10 w-20 h-20 rotate-12" /><PawPrint className="absolute bottom-16 left-20 w-24 h-24 rotate-6" />
                                 <PawPrint className="absolute top-1/2 left-[12%] w-14 h-14 rotate-180" /><PawPrint className="absolute top-12 right-24 w-18 h-18 rotate-45" />
@@ -404,6 +405,7 @@
                                 </div>
                             )}
                             
+                            {/* ★待機中の猫: 中央下方 */}
                             {!isGenerating && (
                                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
                                     <CustomCat className="w-24 h-24" expression="normal" mode="full" />
@@ -420,7 +422,7 @@
                         <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-orange-50 group hover:border-blue-200 transition-colors"><div className="flex items-center gap-2 mb-2"><Icon name="Send" size={20} className="text-blue-500" /><span className="text-xs font-bold text-slate-300 uppercase tracking-widest">TXs</span></div><p className="text-3xl sm:text-5xl font-black">{txs.length}</p></div>
                     </section>
 
-                    <section className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 pb-20 px-2">
+                    <section className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 pb-20 px-2 text-slate-700">
                         <div className="bg-white/40 rounded-[3rem] p-8 border border-slate-100 shadow-sm relative">
                             <h3 className="text-2xl font-black mb-8 flex items-center gap-3 tracking-tight text-slate-800"><Icon name="Box" size={24} className="text-orange-400" />Latest Blocks</h3>
                             <div className="space-y-4">
@@ -438,17 +440,17 @@
                                 ))}
                             </div>
                         </div>
-                        <div className="bg-blue-50/10 rounded-[3rem] p-8 border border-blue-50/50 shadow-sm relative">
+                        <div className="bg-blue-50/10 rounded-[3rem] p-8 border border-blue-50/50 shadow-sm relative text-slate-700">
                             <h3 className="text-2xl font-black mb-8 flex items-center gap-3 tracking-tight text-slate-800"><Icon name="Send" size={24} className="text-blue-400" />Recent TXs</h3>
                             <div className="space-y-4">
                                 {txs.map((t, idx) => (
-                                    <div key={idx} onClick={() => setModalContent({type:'tx', data:t})} className="bg-white rounded-[2rem] p-6 shadow-sm border border-blue-50/50 flex flex-col group cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1 text-slate-700">
+                                    <div key={idx} onClick={() => setModalContent({type:'tx', data:t})} className="bg-white rounded-[2rem] p-6 shadow-sm border border-blue-50/50 flex flex-col group cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1">
                                         <div className="flex items-start gap-4">
                                             <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-400 shrink-0 group-hover:rotate-12 transition-transform text-2xl">🐟</div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="font-black text-blue-500 mb-1 truncate text-sm">{t?.type}</div>
                                                 <div className="flex flex-col gap-0.5 mb-2 mt-1">
-                                                    {/* ★FromとToをアドレスで表示するように修正 */}
+                                                    {/* ★FromとToをアドレスで表示 */}
                                                     <div className="text-[8px] font-black text-slate-400 truncate">FROM: {t?.from}</div>
                                                     <div className="text-[8px] font-black text-slate-400 truncate">TO: {t?.to}</div>
                                                 </div>
