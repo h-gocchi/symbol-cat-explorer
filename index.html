@@ -14,7 +14,7 @@
         body { font-family: 'Inter', sans-serif; background-color: #FFFBF7; color: #475569; }
         .text-shadow-sm { text-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
-        /* 猫の歩行アニメーション: 10秒かけて画面を横切る */
+        /* 猫の歩行アニメーション */
         @keyframes walk-across {
             0% { left: -25%; opacity: 1; }
             95% { left: 120%; opacity: 1; }
@@ -44,10 +44,15 @@
             "https://xym.town:3001",
             "https://api-01.symbol.chat:3001",
             "https://symbol-node.net:3001",
+            "https://symbol-main-1.nemtus.com:3001",
+            "https://000635c1.xym.stir-hosyu.com:3001",
+            "https://sym-main-03.opening-line.jp:3001",
+            "https://sym-main-01.opening-line.jp:3001",
+            "https://symbol-mikun.net:3001",
             "https://nodes.symbol.community:3001"
         ];
         const SYMBOL_GENESIS_TIME = 1615853185;
-        const CHECK_INTERVAL = 30000; // 約30秒（Symbol実速度）
+        const CHECK_INTERVAL = 30000; 
 
         const apiKey = ""; 
         const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
@@ -69,7 +74,7 @@
             if (!timestamp) return "---";
             try {
                 const date = new Date((Number(timestamp) / 1000 + SYMBOL_GENESIS_TIME) * 1000);
-                return date.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                return date.toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             } catch(e) { return "---"; }
         };
 
@@ -110,7 +115,6 @@
                     <svg viewBox={viewBox} className="w-full h-full drop-shadow-sm transition-all duration-300">
                         {mode === "full" && (
                             <React.Fragment>
-                                {/* しっぽ: 左側 */}
                                 <path d="M22 65 Q 6 65 6 40" stroke={color} strokeWidth="10" fill="none" strokeLinecap="round" />
                                 <rect x="34" y="80" width="10" height="10" rx="5" fill={color} />
                                 <rect x="56" y="80" width="10" height="10" rx="5" fill={color} />
@@ -132,7 +136,6 @@
                         <path d="M46 48 Q50 51 54 48" stroke="#555" strokeWidth="1.3" fill="none" />
                     </svg>
                     {mode === "full" && (
-                        /* プレゼント: 身体から離す（1mm相当） */
                         <div className="absolute bottom-5 -right-4 transform rotate-6 scale-[0.7]">
                             <div className="w-10 h-10 bg-[#E9D5B5] border-2 border-[#D8C2A2] rounded-md relative shadow-sm">
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2.5 h-full bg-[#E8A5AC]"></div>
@@ -180,30 +183,26 @@
             const [animationKey, setAnimationKey] = useState(0);
             const [modalContent, setModalContent] = useState(null);
             const [audioBlocked, setAudioBlocked] = useState(true);
-            const [isDemoMode, setIsDemoMode] = useState(false);
             const [headerExpression, setHeaderExpression] = useState('normal');
             
             const audioRef = useRef(null);
             const heightRef = useRef(0);
 
-            // ノードを確実に特定するロジック
             const findNode = async () => {
                 const shuffled = [...NODE_CANDIDATES].sort(() => Math.random() - 0.5);
                 for (let node of shuffled) {
                     try {
                         const controller = new AbortController();
-                        const id = setTimeout(() => controller.abort(), 2500);
+                        const id = setTimeout(() => controller.abort(), 2000);
                         const res = await fetch(`${node}/chain/info`, { signal: controller.signal });
                         clearTimeout(id);
                         if (res.ok) {
                             setActiveNode(node);
-                            setIsDemoMode(false);
                             return node;
                         }
                     } catch(e) {}
                 }
                 setActiveNode("Demo Mode");
-                setIsDemoMode(true);
                 return null;
             };
 
@@ -225,15 +224,8 @@
                 setAnimationKey(k => k + 1);
                 setPlaygroundMessage(`新ブロック #${newHeight} 到着ニヤ！`);
                 playNyariin();
-
-                setTimeout(() => {
-                    setPlaygroundMessage(msg || NEKO_FALLBACK_COMMENTS[Math.floor(Math.random() * NEKO_FALLBACK_COMMENTS.length)]);
-                }, 2000);
-
-                setTimeout(() => {
-                    setIsGenerating(false);
-                    setPlaygroundMessage(null);
-                }, 10500); 
+                setTimeout(() => setPlaygroundMessage(msg || NEKO_FALLBACK_COMMENTS[Math.floor(Math.random() * NEKO_FALLBACK_COMMENTS.length)]), 2000);
+                setTimeout(() => { setIsGenerating(false); setPlaygroundMessage(null); }, 10500);
             };
 
             const updateData = useCallback(async () => {
@@ -242,12 +234,10 @@
                     node = await findNode();
                 }
 
-                if (isDemoMode || !node) {
+                if (!node) {
                     const h = (heightRef.current || 5200000) + 1;
                     heightRef.current = h;
                     setHeight(h);
-                    setBlocks(prev => [{ id: h, height: h, time: new Date().toLocaleTimeString(), hash: "DEMO_" + Math.random() }, ...prev.slice(0, 4)]);
-                    setTxs(prev => [{ id: "DEMO_TX", type: "Transfer", message: "Demo Active", block: "#" + h }, ...prev.slice(0, 4)]);
                     triggerNeko(h, "デモモードで散歩だにゃ！");
                     return;
                 }
@@ -268,31 +258,26 @@
                             fetch(`${node}/transactions/confirmed?limit=5&order=desc`)
                         ]);
                         
-                        const blockData = await bRes.json().catch(() => null);
-                        if (blockData && blockData.data && Array.isArray(blockData.data)) {
-                            setBlocks(blockData.data.map(b => b ? {
-                                id: b.block?.height || "---", 
-                                time: formatSymbolTimestamp(b.block?.timestamp), 
-                                hash: b.meta?.hash || "---"
-                            } : null).filter(Boolean));
+                        const bData = await bRes.json().catch(() => null);
+                        if (bData?.data) {
+                            setBlocks(bData.data.map(b => ({
+                                id: b.block?.height || "---", time: formatSymbolTimestamp(b.block?.timestamp), hash: b.meta?.hash || "---"
+                            })));
                         }
 
-                        const txData = await tRes.json().catch(() => null);
-                        if (txData && txData.data && Array.isArray(txData.data)) {
-                            const mappedTxs = txData.data.map(t => t ? {
-                                id: t.meta?.hash || "---", 
-                                type: "Transfer", 
-                                message: decodeHexMessage(t.transaction?.message), 
-                                block: "#" + (t.meta?.height || "---")
-                            } : null).filter(Boolean);
-                            setTxs(mappedTxs);
-                            if (prevH > 0 && mappedTxs.length > 0) triggerNeko(newHeight, mappedTxs[0].message);
+                        const tData = await tRes.json().catch(() => null);
+                        if (tData?.data) {
+                            const mapped = tData.data.map(t => ({
+                                id: t.meta?.hash || "---", type: "Transfer", message: decodeHexMessage(t.transaction?.message), block: "#" + (t.meta?.height || "---")
+                            }));
+                            setTxs(mapped);
+                            if (prevH > 0) triggerNeko(newHeight, mapped[0]?.message);
                         }
                     }
                 } catch (e) {
-                    setActiveNode(null); 
+                    setActiveNode(null);
                 }
-            }, [activeNode, isDemoMode]);
+            }, [activeNode]);
 
             useEffect(() => {
                 const timer = setInterval(updateData, CHECK_INTERVAL);
@@ -300,7 +285,6 @@
                 return () => clearInterval(timer);
             }, [updateData]);
 
-            // 表情
             useEffect(() => {
                 const timer = setInterval(() => {
                     const rand = Math.random();
@@ -315,8 +299,7 @@
                 <div className="min-h-screen p-4 md:p-8 selection:bg-orange-100 overflow-x-hidden text-slate-700">
                     <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 px-2">
                         <div className="flex items-center gap-4">
-                            {/* 左上の猫: 顔のみ表情あり（修正済み） */}
-                            <div className={`w-14 h-14 bg-[#F47A42] rounded-[1.2rem] flex items-center justify-center shadow-lg cursor-pointer relative ${audioBlocked ? 'ring-4 ring-orange-200 audio-ready-pulse' : ''}`} onClick={() => { playNyariin(); setAudioBlocked(false); setHeaderExpression('happy'); }}>
+                            <div className={`w-14 h-14 bg-[#F47A42] rounded-[1.2rem] flex items-center justify-center shadow-lg cursor-pointer relative ${audioBlocked ? 'ring-4 ring-orange-200 audio-ready-pulse' : ''}`} onClick={() => { playNyariin(); setAudioBlocked(false); }}>
                                 <CustomCat className="w-10 h-10 p-1" color="white" expression={headerExpression} mode="face" />
                                 {audioBlocked && <div className="absolute top-0 right-0 p-1 bg-white rounded-bl-lg text-orange-500"><Icon name="Volume2" size={12} /></div>}
                             </div>
@@ -329,7 +312,6 @@
                     </header>
 
                     <section className="max-w-7xl mx-auto mb-10 px-2 text-slate-700">
-                        {/* Playground Container: relative を確保 */}
                         <div className="bg-white rounded-[3rem] sm:rounded-[4rem] p-8 sm:p-16 relative overflow-hidden shadow-md border border-orange-50 flex flex-col items-center justify-center min-h-[350px] sm:min-h-[420px]">
                             {/* 足跡背景 */}
                             <div className="absolute inset-0 pointer-events-none opacity-30">
@@ -353,14 +335,10 @@
                                 </div>
                             )}
                             
-                            {/* ★待機中の猫: 中央下方（修正：bottom-8 left-1/2 -translate-x-1/2 を適用） */}
+                            {/* ★待機中の猫: 中央下方（修正済み：absolute bottom-8 left-1/2 を適用） */}
                             {!isGenerating && (
                                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
-                                    <CustomCat 
-                                        className="w-24 h-24" 
-                                        expression="normal" 
-                                        mode="full" 
-                                    />
+                                    <CustomCat className="w-24 h-24" expression="normal" mode="full" />
                                 </div>
                             )}
 
