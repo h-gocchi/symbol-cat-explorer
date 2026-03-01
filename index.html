@@ -71,7 +71,12 @@
 
         // --- Symbol アドレス変換ヘルパー (Hex to Base32) ---
         const hexToAddress = (hex) => {
-            if (!hex || hex.length !== 48) return hex;
+            if (!hex) return "---";
+            // すでにBase32アドレス（長さ39）の場合はそのまま返す
+            if (hex.length === 39 && hex.startsWith('N')) return hex;
+            // Hexアドレス（長さ48）の場合のみ変換を試みる
+            if (hex.length !== 48) return hex;
+
             const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
             try {
                 const bytes = hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16));
@@ -172,6 +177,7 @@
                         <path d="M46 48 Q50 51 54 48" stroke="#555" strokeWidth="1.3" fill="none" />
                     </svg>
                     {mode === "full" && (
+                        /* プレゼント: 身体から離す（1mm相当） */
                         <div className="absolute bottom-5 -right-4 transform rotate-6 scale-[0.7]">
                             <div className="w-10 h-10 bg-[#E9D5B5] border-2 border-[#D8C2A2] rounded-md relative shadow-sm">
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2.5 h-full bg-[#E8A5AC]"></div>
@@ -269,7 +275,7 @@
                     try {
                         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents: [{ parts: [{ text: `Symbolブロック #${newHeight} 到着。案内猫の可愛い一言（15文字以内）。語尾〜だにゃ！` }] }] })
+                            body: JSON.stringify({ contents: [{ parts: [{ text: `Symbolブロック #${newHeight} 到着。案内猫の可愛い一言を15文字以内で。語尾〜だにゃ！` }] }] })
                         });
                         const data = await res.json();
                         return data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -334,8 +340,9 @@
                             const mappedTxs = tData.data.map(t => t ? {
                                 id: t.meta?.hash || "---", 
                                 type: "Transfer", 
-                                // ★Fromをパブリックキーではなくアドレスに変更 (meta.signerAddressを使用)
-                                from: t.meta?.signerAddress || t.transaction?.signerPublicKey || "---",
+                                // ★Fromをアドレスに修正 (Hex形式の場合は変換)
+                                from: t.meta?.signerAddress ? hexToAddress(t.meta.signerAddress) : (t.transaction?.signerPublicKey || "---"),
+                                // ★Toをアドレスに修正
                                 to: t.transaction?.recipientAddress ? hexToAddress(t.transaction.recipientAddress) : "---",
                                 message: decodeHexMessage(t.transaction?.message), 
                                 block: "#" + (t.meta?.height || "---")
@@ -369,7 +376,7 @@
                 <div className="min-h-screen p-4 md:p-8 selection:bg-orange-100 overflow-x-hidden text-slate-700">
                     <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 px-2">
                         <div className="flex items-center gap-4">
-                            {/* 左上の猫: 顔のみ */}
+                            {/* 左上の猫: 顔のみ表情あり */}
                             <div className={`w-14 h-14 bg-[#F47A42] rounded-[1.2rem] flex items-center justify-center shadow-lg cursor-pointer relative ${audioBlocked ? 'ring-4 ring-orange-200 audio-ready-pulse' : ''}`} onClick={() => { playNyariin(); setAudioBlocked(false); }}>
                                 <CustomCat className="w-10 h-10 p-1" color="white" expression={headerExpression} mode="face" />
                                 {audioBlocked && <div className="absolute top-0 right-0 p-1 bg-white rounded-bl-lg text-orange-500 shadow-sm"><Icon name="Volume2" size={12} /></div>}
@@ -422,8 +429,8 @@
                         <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-orange-50 group hover:border-blue-200 transition-colors"><div className="flex items-center gap-2 mb-2"><Icon name="Send" size={20} className="text-blue-500" /><span className="text-xs font-bold text-slate-300 uppercase tracking-widest">TXs</span></div><p className="text-3xl sm:text-5xl font-black">{txs.length}</p></div>
                     </section>
 
-                    <section className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 pb-20 px-2 text-slate-700">
-                        <div className="bg-white/40 rounded-[3rem] p-8 border border-slate-100 shadow-sm relative">
+                    <section className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 pb-20 px-2">
+                        <div className="bg-white/40 rounded-[3rem] p-8 border border-slate-100 shadow-sm relative text-slate-700">
                             <h3 className="text-2xl font-black mb-8 flex items-center gap-3 tracking-tight text-slate-800"><Icon name="Box" size={24} className="text-orange-400" />Latest Blocks</h3>
                             <div className="space-y-4">
                                 {blocks.map((b, idx) => (
